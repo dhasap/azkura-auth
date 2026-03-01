@@ -881,6 +881,12 @@ function initProfileMenu() {
     await backupToDrive();
   });
 
+  // Restore from Drive (profile menu)
+  $('#btnRestoreFromDriveMenu')?.addEventListener('click', async () => {
+    overlay.classList.remove('open');
+    await restoreFromDrive();
+  });
+
   // Backup from settings
   $('#btnBackupDriveSettings')?.addEventListener('click', async () => {
     closeModal('#modalSettings');
