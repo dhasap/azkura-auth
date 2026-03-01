@@ -48,7 +48,7 @@
   --totp-danger: #FF3B3B;
 
   --popup-width: 360px;
-  --popup-min-height: 500px;
+  --popup-height: 600px;
 }
 
 /* ── Reset ── */
@@ -61,7 +61,8 @@
 /* ── Base ── */
 html, body {
   width: var(--popup-width);
-  min-height: var(--popup-min-height);
+  height: var(--popup-height);
+  min-height: var(--popup-height);
   background: var(--bg-base);
   color: var(--text-primary);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -103,7 +104,9 @@ input, textarea {
 #app {
   display: flex;
   flex-direction: column;
-  min-height: var(--popup-min-height);
+  width: 100%;
+  height: 100%;
+  min-height: var(--popup-height);
   position: relative;
 }
 
@@ -1607,12 +1610,15 @@ input, textarea {
   body {
     display: flex;
     justify-content: center;
+    align-items: flex-start;
     background: #000;
     min-height: 100vh;
+    height: auto;
   }
   
   #app {
     width: 360px;
+    height: 600px;
     min-height: 600px;
     box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
   }
@@ -1622,9 +1628,13 @@ input, textarea {
 @media screen and (max-width: 399px) {
   html, body {
     width: 100%;
+    height: 100vh;
+    min-height: 100vh;
   }
   
   #app {
     width: 100%;
+    height: 100vh;
+    min-height: 100vh;
   }
 }
