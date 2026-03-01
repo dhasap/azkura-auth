@@ -47,8 +47,7 @@
   --totp-warning: #FF8800;
   --totp-danger: #FF3B3B;
 
-  --popup-width: 360px;
-  --popup-height: 600px;
+  /* Ukuran diatur langsung di body, bukan via variable */
 }
 
 /* ── Reset ── */
@@ -60,9 +59,6 @@
 
 /* ── Base ── */
 html, body {
-  width: var(--popup-width);
-  height: var(--popup-height);
-  min-height: var(--popup-height);
   background: var(--bg-base);
   color: var(--text-primary);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -106,7 +102,6 @@ input, textarea {
   flex-direction: column;
   width: 100%;
   height: 100%;
-  min-height: var(--popup-height);
   position: relative;
 }
 
@@ -1602,39 +1597,19 @@ input, textarea {
 }
 
 /* =========================================================
-   Responsive - Full Tab Mode (Desktop/Mobile Browser)
+   Responsive - Platform Specific Sizing
    ========================================================= */
 
-/* When opened in a full tab (viewport > 400px) - center the content */
-@media screen and (min-width: 400px) {
-  body {
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    background: #000;
-    min-height: 100vh;
-    height: auto;
-  }
-  
-  #app {
-    width: 360px;
-    height: 600px;
-    min-height: 600px;
-    box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
-  }
+/* Default untuk Desktop/Chromebook (Sebagai Ekstensi Popup) */
+body {
+  width: 400px;
+  height: 600px;
 }
 
-/* Mobile responsive - full width on small screens */
-@media screen and (max-width: 399px) {
-  html, body {
-    width: 100%;
-    height: 100vh;
-    min-height: 100vh;
-  }
-  
-  #app {
-    width: 100%;
-    height: 100vh;
-    min-height: 100vh;
+/* Override untuk Mobile Browser (Lemur/Kiwi) saat dibuka di Tab Baru */
+@media screen and (max-width: 768px) {
+  body {
+    width: 100vw !important;
+    height: 100vh !important;
   }
 }
