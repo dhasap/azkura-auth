@@ -7,7 +7,7 @@ import { generateTOTP, getRemainingSeconds, formatCode, isValidSecret } from '..
 import { setupPin, verifyPin, encrypt, getDefaultKey } from '../core/crypto.js';
 import { parseOtpauthURI } from '../core/uri-parser.js';
 import { isLoggedIn, loginGoogle, logoutGoogle, getUserProfile, refreshUserProfile } from '../core/google-auth.js';
-import { uploadBackupToDrive } from '../core/google-drive.js';
+import { uploadBackupToDrive, listBackupsFromDrive, downloadBackupFromDrive } from '../core/google-drive.js';
 import {
   unlockVault,
   lockVault,
@@ -886,12 +886,25 @@ function initProfileMenu() {
     closeModal('#modalSettings');
     await backupToDrive();
   });
+
+  // Restore from settings
+  $('#btnRestoreDriveSettings')?.addEventListener('click', async () => {
+    closeModal('#modalSettings');
+    await restoreFromDrive();
+  });
+
+  // Close restore drive modal
+  $('#closeModalRestoreDrive')?.addEventListener('click', () => closeModal('#modalRestoreDrive'));
+  $('#modalRestoreDrive')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeModal('#modalRestoreDrive');
+  });
 }
 
 async function refreshProfileUI() {
   const loggedOutView = $('#profileMenuLoggedOut');
   const loggedInView = $('#profileMenuLoggedIn');
   const settingsBackupBtn = $('#btnBackupDriveSettings');
+  const settingsRestoreBtn = $('#btnRestoreDriveSettings');
 
   // Check login status
   const loggedIn = await isLoggedIn();
@@ -922,11 +935,13 @@ async function refreshProfileUI() {
     loggedOutView.style.display = 'none';
     loggedInView.style.display = 'block';
     if (settingsBackupBtn) settingsBackupBtn.style.display = 'flex';
+    if (settingsRestoreBtn) settingsRestoreBtn.style.display = 'flex';
   } else {
     googleUser = null;
     loggedOutView.style.display = 'block';
     loggedInView.style.display = 'none';
     if (settingsBackupBtn) settingsBackupBtn.style.display = 'none';
+    if (settingsRestoreBtn) settingsRestoreBtn.style.display = 'none';
 
     // Reset header avatar
     $('#profileAvatar').innerHTML = `
@@ -952,6 +967,129 @@ async function backupToDrive() {
   } else {
     showToast('Backup failed: ' + result.error, 'error');
   }
+}
+
+// Restore from Google Drive
+async function restoreFromDrive() {
+  if (!(await isLoggedIn())) {
+    showToast('Please sign in with Google first', 'error');
+    return;
+  }
+
+  // Show modal
+  openModal('#modalRestoreDrive');
+  
+  // Reset state
+  $('#restoreDriveLoading').style.display = 'block';
+  $('#restoreDriveEmpty').style.display = 'none';
+  $('#restoreDriveList').style.display = 'none';
+  $('#restoreDriveError').style.display = 'none';
+  $('#restoreDriveFiles').innerHTML = '';
+
+  // Fetch backups
+  const result = await listBackupsFromDrive(10);
+  
+  $('#restoreDriveLoading').style.display = 'none';
+
+  if (!result.success) {
+    $('#restoreDriveError').textContent = 'Failed to load backups: ' + result.error;
+    $('#restoreDriveError').style.display = 'block';
+    return;
+  }
+
+  const files = result.files;
+  if (!files || files.length === 0) {
+    $('#restoreDriveEmpty').style.display = 'block';
+    return;
+  }
+
+  // Show file list
+  $('#restoreDriveList').style.display = 'block';
+  const container = $('#restoreDriveFiles');
+  
+  files.forEach(file => {
+    const date = new Date(file.createdTime).toLocaleString('id-ID', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    const size = file.size ? `(${(parseInt(file.size) / 1024).toFixed(1)} KB)` : '';
+    
+    const item = document.createElement('div');
+    item.className = 'restore-file-item';
+    item.innerHTML = `
+      <div class="restore-file-icon">📦</div>
+      <div class="restore-file-info">
+        <div class="restore-file-name">${file.name}</div>
+        <div class="restore-file-date">${date} ${size}</div>
+      </div>
+      <div class="restore-file-size">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:var(--accent);">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </div>
+    `;
+    item.addEventListener('click', () => downloadAndRestore(file.id, file.name));
+    container.appendChild(item);
+  });
+}
+
+async function downloadAndRestore(fileId, fileName) {
+  showToast('Downloading backup...', 'info');
+  
+  const result = await downloadBackupFromDrive(fileId);
+  
+  if (!result.success) {
+    showToast('Download failed: ' + result.error, 'error');
+    return;
+  }
+
+  // Close restore modal
+  closeModal('#modalRestoreDrive');
+  
+  // Show import password modal
+  $('#importPassword').value = '';
+  $('#importPasswordError').classList.remove('visible');
+  $('#importFileInfo').textContent = `File: ${fileName} from Google Drive. Enter the backup password.`;
+  
+  // Store data temporarily
+  const backupData = result.data;
+  const backupJson = JSON.stringify(backupData);
+  
+  // Override import button handler for Drive restore
+  const originalHandler = $('#btnImportConfirm').onclick;
+  $('#btnImportConfirm').onclick = async () => {
+    const pw = $('#importPassword').value;
+    const errEl = $('#importPasswordError');
+
+    if (!pw) {
+      errEl.textContent = 'Please enter the backup password';
+      errEl.classList.add('visible');
+      return;
+    }
+
+    try {
+      $('#btnImportConfirm').disabled = true;
+      const result = await importBackup(backupJson, pw, currentPassword);
+      currentAccounts = await getAccounts();
+      renderAccounts(currentAccounts);
+      closeModal('#modalImportPassword');
+      closeModal('#modalSettings');
+      showToast(`Restored ${result.imported} account(s) from Drive!`, 'success');
+      
+      // Restore original handler
+      $('#btnImportConfirm').onclick = originalHandler;
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.classList.add('visible');
+    } finally {
+      $('#btnImportConfirm').disabled = false;
+    }
+  };
+  
+  openModal('#modalImportPassword');
 }
 
 // ─── Settings ─────────────────────────────────────────────────────────────────

@@ -146,9 +146,11 @@ input, textarea {
   flex-shrink: 0;
 }
 
-.header-logo svg {
+.header-logo svg,
+.header-logo img {
   width: 32px;
   height: 32px;
+  object-fit: cover;
 }
 
 .header-title {
@@ -1349,4 +1351,73 @@ input, textarea {
 }
 .privacy-mode .account-code:hover {
   filter: none;
+}
+
+/* =========================================================
+   Animations
+   ========================================================= */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* =========================================================
+   Restore from Drive
+   ========================================================= */
+.restore-file-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.restore-file-item:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent);
+}
+
+.restore-file-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.restore-file-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.restore-file-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.restore-file-date {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.restore-file-size {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Settings Modal Scroll Fix */
+#modalSettings .modal-body {
+  max-height: calc(85vh - 60px);
+  overflow-y: auto;
 }

@@ -9,6 +9,10 @@
     "file": "assets/modulepreload-polyfill-B5Qt9EMX.js",
     "name": "modulepreload-polyfill"
   },
+  "icons/icon128.png": {
+    "file": "assets/icon128-BTwHR2_d.png",
+    "src": "icons/icon128.png"
+  },
   "src/background/service-worker.js": {
     "file": "assets/service-worker.js-DUYcnKh-.js",
     "name": "service-worker.js",
@@ -16,7 +20,7 @@
     "isEntry": true
   },
   "src/popup/index.html": {
-    "file": "assets/popup-BkNFMoG7.js",
+    "file": "assets/popup-_f50anuc.js",
     "name": "popup",
     "src": "src/popup/index.html",
     "isEntry": true,
@@ -24,7 +28,10 @@
       "_modulepreload-polyfill-B5Qt9EMX.js"
     ],
     "css": [
-      "assets/popup-Cqsy_7QP.css"
+      "assets/popup-vOaZwCeh.css"
+    ],
+    "assets": [
+      "assets/icon128-BTwHR2_d.png"
     ]
   },
   "src/scanner/scanner.html": {
