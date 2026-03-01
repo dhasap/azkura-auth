@@ -29,30 +29,82 @@ function generateId() {
 export function getServiceMeta(issuer) {
   const name = (issuer || '').toLowerCase();
   const colorMap = {
+    // Gaming & Social
     discord: { bg: '#5865F2', emoji: '🎮' },
-    github: { bg: '#24292e', emoji: '🐙' },
-    google: { bg: '#4285F4', emoji: '🔵' },
-    gmail: { bg: '#EA4335', emoji: '📧' },
-    aws: { bg: '#FF9900', emoji: '☁️' },
-    amazon: { bg: '#FF9900', emoji: '📦' },
-    stripe: { bg: '#6772E5', emoji: '💳' },
+    twitch: { bg: '#9146FF', emoji: '📺' },
     twitter: { bg: '#1DA1F2', emoji: '🐦' },
     x: { bg: '#000000', emoji: '✖️' },
     facebook: { bg: '#1877F2', emoji: '📘' },
     instagram: { bg: '#E1306C', emoji: '📷' },
-    microsoft: { bg: '#00A4EF', emoji: '🪟' },
-    apple: { bg: '#555555', emoji: '🍎' },
-    gitlab: { bg: '#FC6D26', emoji: '🦊' },
-    dropbox: { bg: '#0061FF', emoji: '📦' },
-    slack: { bg: '#4A154B', emoji: '💬' },
-    twitch: { bg: '#9146FF', emoji: '🎮' },
     reddit: { bg: '#FF4500', emoji: '🤖' },
     linkedin: { bg: '#0A66C2', emoji: '💼' },
+    tiktok: { bg: '#000000', emoji: '🎵' },
+    snapchat: { bg: '#FFFC00', emoji: '👻' },
+    whatsapp: { bg: '#25D366', emoji: '💬' },
+    telegram: { bg: '#0088cc', emoji: '✈️' },
+    signal: { bg: '#3A76F0', emoji: '🔒' },
+    
+    // Google services
+    google: { bg: '#4285F4', emoji: '🔵' },
+    gmail: { bg: '#EA4335', emoji: '📧' },
+    youtube: { bg: '#FF0000', emoji: '▶️' },
+    
+    // Microsoft services
+    microsoft: { bg: '#00A4EF', emoji: '🪟' },
+    outlook: { bg: '#0078D4', emoji: '📧' },
+    office: { bg: '#D83B01', emoji: '📄' },
+    xbox: { bg: '#107C10', emoji: '🎮' },
+    azure: { bg: '#0089D6', emoji: '☁️' },
+    
+    // Developer & Cloud
+    github: { bg: '#24292e', emoji: '🐙' },
+    gitlab: { bg: '#FC6D26', emoji: '🦊' },
+    bitbucket: { bg: '#0052CC', emoji: '🪣' },
+    aws: { bg: '#FF9900', emoji: '☁️' },
+    amazon: { bg: '#FF9900', emoji: '📦' },
     cloudflare: { bg: '#F48120', emoji: '☁️' },
     digitalocean: { bg: '#0080FF', emoji: '🌊' },
+    heroku: { bg: '#430098', emoji: '🟣' },
+    vercel: { bg: '#000000', emoji: '▲' },
+    netlify: { bg: '#00C7B7', emoji: '🚀' },
+    firebase: { bg: '#FFCA28', emoji: '🔥' },
+    docker: { bg: '#2496ED', emoji: '🐳' },
+    
+    // Productivity
+    notion: { bg: '#000000', emoji: '📝' },
+    slack: { bg: '#4A154B', emoji: '💬' },
+    dropbox: { bg: '#0061FF', emoji: '📦' },
+    figma: { bg: '#F24E1E', emoji: '🎨' },
+    trello: { bg: '#0079BF', emoji: '📋' },
+    asana: { bg: '#F06A6A', emoji: '✓' },
+    linear: { bg: '#5E6AD2', emoji: '🎯' },
+    
+    // Security & Password Managers
     bitwarden: { bg: '#175DDC', emoji: '🔐' },
+    '1password': { bg: '#3B66BC', emoji: '🔑' },
+    lastpass: { bg: '#D32D27', emoji: '🔒' },
+    authy: { bg: '#EC7C34', emoji: '🔐' },
+    
+    // Finance & Crypto
+    stripe: { bg: '#6772E5', emoji: '💳' },
+    paypal: { bg: '#003087', emoji: '💰' },
     binance: { bg: '#F0B90B', emoji: '₿' },
     coinbase: { bg: '#0052FF', emoji: '🪙' },
+    kraken: { bg: '#5741D9', emoji: '🐙' },
+    ftx: { bg: '#02D084', emoji: '📈' },
+    robinhood: { bg: '#00C805', emoji: '🏹' },
+    
+    // Apple
+    apple: { bg: '#555555', emoji: '🍎' },
+    icloud: { bg: '#3693F7', emoji: '☁️' },
+    
+    // Other
+    shopify: { bg: '#96BF48', emoji: '🛒' },
+    wordpress: { bg: '#21759B', emoji: '📝' },
+    namecheap: { bg: '#DE3723', emoji: '🌐' },
+    'go daddy': { bg: '#1BDBDB', emoji: '🌐' },
+    godaddy: { bg: '#1BDBDB', emoji: '🌐' },
+    epik: { bg: '#1C1C1C', emoji: '🌐' },
   };
 
   for (const [key, val] of Object.entries(colorMap)) {
