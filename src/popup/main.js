@@ -17,7 +17,9 @@ import {
   deleteAllAccounts,
   wipeAllData,
   exportBackup,
+  exportPlainBackup,
   importBackup,
+  importPlainBackup,
   restoreFromDriveBackup,
   getAccounts,
   searchAccounts,
@@ -1284,35 +1286,10 @@ function initSettings() {
     }
   });
 
-  // Export
-  $('#btnExportData').addEventListener('click', () => {
-    $('#exportPassword').value = '';
-    $('#exportPasswordConfirm').value = '';
-    $('#exportPasswordError').classList.remove('visible');
-    openModal('#modalExportPassword');
-  });
-
-  $('#closeModalExport').addEventListener('click', () => closeModal('#modalExportPassword'));
-
-  $('#btnExportConfirm').addEventListener('click', async () => {
-    const pw1 = $('#exportPassword').value;
-    const pw2 = $('#exportPasswordConfirm').value;
-    const errEl = $('#exportPasswordError');
-
-    if (!pw1) {
-      errEl.textContent = 'Please enter a password';
-      errEl.classList.add('visible');
-      return;
-    }
-    if (pw1 !== pw2) {
-      errEl.textContent = 'Passwords do not match';
-      errEl.classList.add('visible');
-      return;
-    }
-
+  // Export (Plain text - no password)
+  $('#btnExportData').addEventListener('click', async () => {
     try {
-      $('#btnExportConfirm').disabled = true;
-      const json = await exportBackup(pw1);
+      const json = await exportPlainBackup();
       const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1320,24 +1297,43 @@ function initSettings() {
       a.download = `azkura-backup-${new Date().toISOString().slice(0,10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      closeModal('#modalExportPassword');
       showToast('Backup exported!', 'success');
     } catch (err) {
-      errEl.textContent = 'Export failed: ' + err.message;
-      errEl.classList.add('visible');
-    } finally {
-      $('#btnExportConfirm').disabled = false;
+      showToast('Export failed: ' + err.message, 'error');
     }
   });
 
   // Import
-  $('#importFileInput').addEventListener('change', (e) => {
+  $('#importFileInput').addEventListener('change', async (e) => {
     pendingImportFile = e.target.files[0];
     if (!pendingImportFile) return;
-    $('#importPassword').value = '';
-    $('#importPasswordError').classList.remove('visible');
-    $('#importFileInfo').textContent = `File: ${pendingImportFile.name}. Enter the backup password.`;
-    openModal('#modalImportPassword');
+    
+    try {
+      const text = await pendingImportFile.text();
+      const backup = JSON.parse(text);
+      
+      // Check if it's a plain backup (no encryption) or encrypted backup
+      if (backup.accounts && !backup.encrypted) {
+        // Plain backup - import directly without password
+        const result = await importPlainBackup(text, currentPassword);
+        currentAccounts = await getAccounts();
+        renderAccounts(currentAccounts);
+        closeModal('#modalSettings');
+        showToast(`Imported ${result.imported} account(s)!`, 'success');
+        pendingImportFile = null;
+      } else if (backup.encrypted) {
+        // Encrypted backup - show password modal
+        $('#importPassword').value = '';
+        $('#importPasswordError').classList.remove('visible');
+        $('#importFileInfo').textContent = `File: ${pendingImportFile.name}. This backup is encrypted. Enter the password.`;
+        openModal('#modalImportPassword');
+      } else {
+        showToast('Invalid backup file format', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to read file: ' + err.message, 'error');
+    }
+    
     e.target.value = ''; // reset so same file can be re-selected
   });
 

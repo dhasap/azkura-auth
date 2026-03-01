@@ -5,6 +5,11 @@
     "src": "../../../@crx/manifest",
     "isEntry": true
   },
+  "_accounts-YaHucQfM.js": {
+    "file": "assets/accounts-YaHucQfM.js",
+    "name": "accounts",
+    "isDynamicEntry": true
+  },
   "_modulepreload-polyfill-B5Qt9EMX.js": {
     "file": "assets/modulepreload-polyfill-B5Qt9EMX.js",
     "name": "modulepreload-polyfill"
@@ -19,28 +24,40 @@
     "src": "src/background/service-worker.js",
     "isEntry": true
   },
+  "src/core/uri-parser.js": {
+    "file": "assets/uri-parser-CbsR1lsV.js",
+    "name": "uri-parser",
+    "src": "src/core/uri-parser.js",
+    "isDynamicEntry": true
+  },
   "src/popup/index.html": {
-    "file": "assets/popup-qmvL_I0J.js",
+    "file": "assets/popup-CkQI_sp_.js",
     "name": "popup",
     "src": "src/popup/index.html",
     "isEntry": true,
     "imports": [
-      "_modulepreload-polyfill-B5Qt9EMX.js"
+      "_modulepreload-polyfill-B5Qt9EMX.js",
+      "_accounts-YaHucQfM.js",
+      "src/core/uri-parser.js"
     ],
     "css": [
-      "assets/popup-CFn5TRha.css"
+      "assets/popup-CcIg9uEr.css"
     ],
     "assets": [
       "assets/icon128-BTwHR2_d.png"
     ]
   },
   "src/scanner/scanner.html": {
-    "file": "assets/scanner-CyKHrveN.js",
+    "file": "assets/scanner-DoHtBD6J.js",
     "name": "scanner",
     "src": "src/scanner/scanner.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-B5Qt9EMX.js"
+    ],
+    "dynamicImports": [
+      "src/core/uri-parser.js",
+      "_accounts-YaHucQfM.js"
     ]
   }
 }

@@ -3,7 +3,8 @@
  * CRUD operations + export/import with encryption
  */
 
-import { encrypt, decrypt } from './crypto.js';
+import { encrypt, decrypt, getDefaultKey } from './crypto.js';
+export { getDefaultKey };
 import {
   getLocalItem,
   setLocalItem,
@@ -203,6 +204,24 @@ export async function exportBackup(exportPassword) {
 }
 
 /**
+ * Export accounts as plain JSON backup (no encryption)
+ * @returns {Promise<string>} JSON string for download
+ */
+export async function exportPlainBackup() {
+  const accounts = await getAccounts();
+
+  const backup = {
+    app: 'azkura-auth',
+    version: '1.0.0',
+    exportedAt: new Date().toISOString(),
+    accountCount: accounts.length,
+    accounts, // Plain accounts array, no encryption
+  };
+
+  return JSON.stringify(backup, null, 2);
+}
+
+/**
  * Import accounts from encrypted JSON backup
  * @param {string} jsonString - Content of backup file
  * @param {string} importPassword - Password used when exporting
@@ -228,6 +247,48 @@ export async function importBackup(jsonString, importPassword, vaultPassword) {
     throw new Error('Invalid backup: corrupted account data');
   }
 
+  const existing = await getAccounts();
+  const existingIds = new Set(existing.map(a => a.secret + a.account));
+
+  // Add accounts that don't already exist (by secret + account combo)
+  const newAccounts = importedAccounts.filter(a =>
+    !existingIds.has(a.secret + a.account)
+  );
+
+  const merged = [...existing, ...newAccounts.map(a => ({
+    ...a,
+    id: generateId(), // new ID to avoid collisions
+  }))];
+
+  await setSessionAccounts(merged);
+  await saveVault(vaultPassword);
+
+  return { imported: newAccounts.length, total: merged.length };
+}
+
+/**
+ * Import accounts from plain JSON backup (no encryption)
+ * @param {string} jsonString - Content of backup file
+ * @param {string} vaultPassword - Current vault password to encrypt
+ * @returns {Promise<{imported: number, total: number}>}
+ */
+export async function importPlainBackup(jsonString, vaultPassword) {
+  let backup;
+  try {
+    backup = JSON.parse(jsonString);
+  } catch {
+    throw new Error('Invalid backup file: not valid JSON');
+  }
+
+  if (backup.app !== 'azkura-auth') {
+    throw new Error('Invalid backup file: not an Azkura Auth backup');
+  }
+
+  if (!backup.accounts || !Array.isArray(backup.accounts)) {
+    throw new Error('Invalid backup: no accounts data found');
+  }
+
+  const importedAccounts = backup.accounts;
   const existing = await getAccounts();
   const existingIds = new Set(existing.map(a => a.secret + a.account));
 

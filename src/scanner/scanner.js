@@ -176,7 +176,7 @@ async function processImage(file) {
   }
 }
 
-function onQRFound(data, source) {
+async function onQRFound(data, source) {
   scanActive = false;
 
   // Stop camera
@@ -199,18 +199,65 @@ function onQRFound(data, source) {
     return;
   }
 
-  // Send to popup
-  chrome.runtime.sendMessage({ type: 'QR_SCANNED', data });
+  // Parse the QR data and add account directly
+  try {
+    // Import the parser dynamically
+    const { parseOtpauthURI } = await import('../core/uri-parser.js');
+    const parsed = parseOtpauthURI(data);
+    
+    if (!parsed || !parsed.secret) {
+      throw new Error('Invalid TOTP data');
+    }
 
-  if (source === 'camera') {
-    statusTextCamera.textContent = '✓ Account added! Closing...';
-    statusTextCamera.className = 'status-text success';
-  } else {
-    statusTextUpload.textContent = '✓ Account added! Closing...';
-    statusTextUpload.className = 'status-text success';
+    // Import accounts module
+    const { addAccount, getDefaultKey } = await import('../core/accounts.js');
+    
+    // Add the account (using default key since we're not in popup context)
+    const defaultKey = await getDefaultKey();
+    await addAccount({
+      issuer: parsed.issuer || '',
+      account: parsed.account || '',
+      secret: parsed.secret,
+      algorithm: parsed.algorithm || 'SHA1',
+      digits: parsed.digits || 6,
+      period: parsed.period || 30
+    }, defaultKey);
+
+    // Show success message
+    if (source === 'camera') {
+      statusTextCamera.textContent = '✓ Account added! Closing...';
+      statusTextCamera.className = 'status-text success';
+    } else {
+      statusTextUpload.textContent = '✓ Account added! Closing...';
+      statusTextUpload.className = 'status-text success';
+    }
+
+    // Alert user and close tab (important for mobile)
+    setTimeout(() => {
+      alert('✅ Akun berhasil ditambahkan!');
+      window.close();
+    }, 500);
+    
+  } catch (error) {
+    console.error('Failed to add account:', error);
+    
+    // Fallback: send message to popup if direct add fails
+    chrome.runtime.sendMessage({ type: 'QR_SCANNED', data });
+    
+    if (source === 'camera') {
+      statusTextCamera.textContent = '✓ Account saved! Closing...';
+      statusTextCamera.className = 'status-text success';
+    } else {
+      statusTextUpload.textContent = '✓ Account saved! Closing...';
+      statusTextUpload.className = 'status-text success';
+    }
+    
+    // Alert and close even on fallback
+    setTimeout(() => {
+      alert('✅ Akun berhasil ditambahkan!');
+      window.close();
+    }, 500);
   }
-  
-  setTimeout(() => window.close(), 1500);
 }
 
 // Check URL params for initial tab
