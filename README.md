@@ -21,7 +21,7 @@ Chrome Extension untuk Two-Factor Authentication (2FA) dengan fitur backup ke Go
 
 ```bash
 git clone <repository-url>
-cd authenticator-azkura
+cd azkura-auth
 npm install
 ```
 
@@ -88,7 +88,7 @@ Jika menggunakan Client ID sendiri, update di `manifest.json`:
 ## 📁 Struktur Folder
 
 ```
-authenticator-azkura/
+azkura-auth/
 ├── src/
 │   ├── popup/           # Popup UI (HTML, CSS, JS)
 │   ├── core/            # Core logic
