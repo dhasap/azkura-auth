@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Azkura Auth — Scan QR Code</title>
+  <style>
+    :root {
+      --accent: #00E5FF;
+      --bg-base: #0A0A0A;
+      --bg-card: #161616;
+      --text-primary: #FFFFFF;
+      --text-secondary: #888888;
+      --border-subtle: rgba(255,255,255,0.06);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg-base);
+      color: var(--text-primary);
+      font-family: 'Inter', -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 24px 16px;
+      gap: 20px;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 20px;
+      font-weight: 700;
+    }
+    .logo svg { width: 32px; height: 32px; }
+    h2 {
+      font-size: 18px;
+      font-weight: 700;
+      text-align: center;
+    }
+    .subtitle {
+      font-size: 13px;
+      color: var(--text-secondary);
+      text-align: center;
+      line-height: 1.6;
+      max-width: 380px;
+    }
+    .video-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 400px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 2px solid var(--border-subtle);
+      background: #000;
+      aspect-ratio: 1;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    canvas { display: none; }
+    .scan-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+    .scan-frame {
+      width: 60%;
+      aspect-ratio: 1;
+      position: relative;
+    }
+    .scan-corner {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-color: var(--accent);
+      border-style: solid;
+    }
+    .scan-corner.tl { top: 0; left: 0; border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+    .scan-corner.tr { top: 0; right: 0; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
+    .scan-corner.bl { bottom: 0; left: 0; border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
+    .scan-corner.br { bottom: 0; right: 0; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
+    .scan-line {
+      position: absolute;
+      left: 5%;
+      right: 5%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      animation: scanLine 2s ease-in-out infinite;
+    }
+    @keyframes scanLine {
+      0%   { top: 5%; opacity: 1; }
+      50%  { top: 90%; opacity: 1; }
+      100% { top: 5%; opacity: 1; }
+    }
+    .status-text {
+      font-size: 14px;
+      color: var(--text-secondary);
+      text-align: center;
+      min-height: 20px;
+    }
+    .status-text.success { color: var(--accent); font-weight: 600; }
+    .status-text.error   { color: #FF3B3B; }
+    .btn {
+      padding: 12px 28px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      font-family: inherit;
+      transition: all 0.15s ease;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #000;
+    }
+    .btn-primary:hover { background: #33ECFF; }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+    .btn-ghost:hover { color: var(--text-primary); background: var(--bg-card); }
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+    .permission-error {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      text-align: center;
+      padding: 40px 24px;
+    }
+    .permission-error.visible { display: flex; }
+    .permission-icon { font-size: 48px; }
+  </style>
+  <script type="module" crossorigin src="/assets/scanner-BKN1U8JC.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-B5Qt9EMX.js">
+</head>
+<body>
+  <div class="logo">
+    <svg viewBox="0 0 32 32" fill="none">
+      <polygon points="16,2 29,9 29,23 16,30 3,23 3,9" fill="#00E5FF" opacity="0.2" stroke="#00E5FF" stroke-width="1.5"/>
+      <polygon points="16,6 25,11 25,21 16,26 7,21 7,11" fill="#00E5FF" opacity="0.5"/>
+      <text x="16" y="20" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" font-weight="700" fill="#0A0A0A">A</text>
+    </svg>
+    Azkura Auth
+  </div>
+
+  <h2>Scan QR Code</h2>
+  <p class="subtitle">Point the camera at a TOTP QR code to scan it automatically</p>
+
+  <div class="video-wrapper" id="videoWrapper">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="canvas"></canvas>
+    <div class="scan-overlay">
+      <div class="scan-frame">
+        <div class="scan-corner tl"></div>
+        <div class="scan-corner tr"></div>
+        <div class="scan-corner bl"></div>
+        <div class="scan-corner br"></div>
+        <div class="scan-line"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-text" id="statusText">Initializing camera...</div>
+
+  <div class="permission-error" id="permissionError">
+    <div class="permission-icon">📷</div>
+    <div>
+      <strong>Camera access denied</strong><br/>
+      <span style="font-size:13px;color:#888;">Please allow camera access and try again, or close this tab and use "Upload QR Image" instead.</span>
+    </div>
+    <button class="btn btn-primary" onclick="startScanner()">Retry</button>
+    <button class="btn btn-ghost" onclick="window.close()">Close</button>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-ghost" onclick="window.close()">Close Tab</button>
+  </div>
+
+</body>
+</html>

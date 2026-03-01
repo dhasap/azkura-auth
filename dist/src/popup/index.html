@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=360, initial-scale=1.0" />
+  <title>Azkura Auth</title>
+  <script type="module" crossorigin src="/assets/popup-lZE5dBrY.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-B5Qt9EMX.js">
+  <link rel="stylesheet" crossorigin href="/assets/popup-Cqsy_7QP.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- Toast container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- ═══════════════════════════════════════
+         VIEW: ONBOARDING (First-time setup)
+    ═══════════════════════════════════════ -->
+    <div class="view" id="viewOnboarding">
+      <div class="lock-view">
+        <div class="lock-logo">
+          <svg class="lock-logo-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="32,4 58,18 58,46 32,60 6,46 6,18" fill="var(--accent)" opacity="0.15" stroke="var(--accent)" stroke-width="2"/>
+            <polygon points="32,12 50,22 50,42 32,52 14,42 14,22" fill="var(--accent)" opacity="0.3"/>
+            <text x="32" y="38" text-anchor="middle" font-family="Inter,sans-serif" font-size="20" font-weight="700" fill="var(--bg-base)">A</text>
+          </svg>
+          <div class="lock-app-name">Azkura Auth</div>
+        </div>
+
+        <div class="onboard-steps">
+          <div class="onboard-step active" id="step1dot"></div>
+          <div class="onboard-step" id="step2dot"></div>
+          <div class="onboard-step" id="step3dot"></div>
+        </div>
+
+        <!-- Step 1: Welcome -->
+        <div id="onboardStep1" style="width:100%;text-align:center;display:flex;flex-direction:column;gap:16px;">
+          <div>
+            <div style="font-size:18px;font-weight:700;margin-bottom:6px;">Welcome to Azkura Auth</div>
+            <div style="font-size:13px;color:var(--text-secondary);line-height:1.7;">
+              A secure, beautiful TOTP authenticator.<br/>
+              Protect your codes with a PIN or skip for quick access.
+            </div>
+          </div>
+          <button class="btn btn-primary btn-full" id="btnOnboardStart">Set Up PIN</button>
+          <button class="btn btn-ghost btn-full" id="btnSkipPin">Skip for Now</button>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">
+            ⚠️ Without PIN, your data is less secure
+          </div>
+        </div>
+
+        <!-- Step 2: Create PIN -->
+        <div id="onboardStep2" style="width:100%;display:none;flex-direction:column;gap:16px;">
+          <div style="text-align:center;">
+            <div style="font-size:16px;font-weight:700;margin-bottom:6px;">Create your PIN</div>
+            <div style="font-size:12px;color:var(--text-secondary);">Enter a 6-digit PIN to secure your account</div>
+          </div>
+          <div class="pin-dots" id="pinDotsCreate">
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+          </div>
+          <div class="pin-keypad" id="pinKeypadCreate">
+            <!-- Keypad rendered by JS -->
+          </div>
+          <div id="pinCreateError" class="form-error" style="text-align:center;"></div>
+          <button class="btn btn-ghost btn-full" id="btnBackToWelcome" style="margin-top:8px;">← Back</button>
+        </div>
+
+        <!-- Step 3: Confirm PIN -->
+        <div id="onboardStep3" style="width:100%;display:none;flex-direction:column;gap:16px;">
+          <div style="text-align:center;">
+            <div style="font-size:16px;font-weight:700;margin-bottom:6px;">Confirm your PIN</div>
+            <div style="font-size:12px;color:var(--text-secondary);">Enter the same PIN again to confirm</div>
+          </div>
+          <div class="pin-dots" id="pinDotsConfirm">
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+          </div>
+          <div class="pin-keypad" id="pinKeypadConfirm">
+            <!-- Keypad rendered by JS -->
+          </div>
+          <div id="pinConfirmError" class="form-error" style="text-align:center;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════
+         VIEW: LOCK SCREEN
+    ═══════════════════════════════════════ -->
+    <div class="view" id="viewLock">
+      <div class="lock-view">
+        <div class="lock-logo">
+          <svg class="lock-logo-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="32,4 58,18 58,46 32,60 6,46 6,18" fill="var(--accent)" opacity="0.15" stroke="var(--accent)" stroke-width="2"/>
+            <polygon points="32,12 50,22 50,42 32,52 14,42 14,22" fill="var(--accent)" opacity="0.3"/>
+            <text x="32" y="38" text-anchor="middle" font-family="Inter,sans-serif" font-size="20" font-weight="700" fill="var(--bg-base)">A</text>
+          </svg>
+          <div class="lock-app-name">Azkura Auth</div>
+        </div>
+        <div class="lock-subtitle">Enter your PIN to unlock</div>
+        <div style="width:100%;display:flex;flex-direction:column;gap:16px;">
+          <div class="pin-dots" id="pinDotsLock">
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+          </div>
+          <div class="pin-keypad" id="pinKeypadLock">
+            <!-- Keypad rendered by JS -->
+          </div>
+          <div id="pinLockError" class="form-error" style="text-align:center;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════
+         VIEW: MAIN
+    ═══════════════════════════════════════ -->
+    <div class="view" id="viewMain">
+
+      <!-- Header -->
+      <header class="header">
+        <div class="header-logo">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="16,2 29,9 29,23 16,30 3,23 3,9" fill="var(--accent)" opacity="0.2" stroke="var(--accent)" stroke-width="1.5"/>
+            <polygon points="16,6 25,11 25,21 16,26 7,21 7,11" fill="var(--accent)" opacity="0.5"/>
+            <text x="16" y="20" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" font-weight="700" fill="var(--bg-base)">A</text>
+          </svg>
+        </div>
+        <div class="header-title">Azkura</div>
+        <div class="header-actions">
+          <button class="icon-btn" id="btnSettings" title="Settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </button>
+          <!-- Profile Button (replaces old 3-dot menu) -->
+          <button class="icon-btn profile-btn" id="btnProfile" title="Profile">
+            <div class="profile-avatar" id="profileAvatar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            </div>
+          </button>
+        </div>
+      </header>
+
+      <!-- Search -->
+      <div class="search-container">
+        <div class="search-bar">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input type="text" class="search-input" id="searchInput" placeholder="Search accounts..." autocomplete="off" />
+          <button class="search-clear" id="searchClear" title="Clear search">✕</button>
+        </div>
+      </div>
+
+      <!-- Accounts list -->
+      <div class="accounts-list" id="accountsList">
+        <!-- Empty state / accounts rendered by JS -->
+      </div>
+
+      <!-- FAB -->
+      <div class="fab-container" id="fabContainer">
+        <div class="fab-menu" id="fabMenu">
+          <div class="fab-menu-item">
+            <span class="fab-menu-label">Scan QR Code</span>
+            <button class="fab-mini" id="btnScanQR" title="Scan QR">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                <path d="M14 14h.01M14 17h3M17 14v3M20 17h.01M20 20h.01M17 20h.01"/>
+              </svg>
+            </button>
+          </div>
+          <div class="fab-menu-item">
+            <span class="fab-menu-label">Upload QR Image</span>
+            <button class="fab-mini" id="btnUploadQR" title="Upload QR image">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            </button>
+          </div>
+          <div class="fab-menu-item">
+            <span class="fab-menu-label">Enter Manually</span>
+            <button class="fab-mini" id="btnManualEntry" title="Manual entry">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <button class="fab" id="fabBtn" title="Add account">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </button>
+      </div>
+
+    </div><!-- end viewMain -->
+
+    <!-- ═══════════════════════════════════════
+         MODAL: PROFILE MENU
+    ═══════════════════════════════════════ -->
+    <div class="modal-overlay profile-menu-overlay" id="profileMenuOverlay">
+      <div class="profile-menu" id="profileMenu">
+        <!-- Logged out state -->
+        <div class="profile-menu-content" id="profileMenuLoggedOut">
+          <div class="profile-menu-header">
+            <div class="profile-avatar-large">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            </div>
+            <div class="profile-info">
+              <div class="profile-name">Guest User</div>
+              <div class="profile-email">Sign in to sync & backup</div>
+            </div>
+          </div>
+          <div class="profile-menu-actions">
+            <button class="btn btn-primary btn-full" id="btnLoginGoogle">
+              <svg viewBox="0 0 24 24" width="18" height="18" style="margin-right:8px;">
+                <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              Sign in with Google
+            </button>
+          </div>
+        </div>
+
+        <!-- Logged in state -->
+        <div class="profile-menu-content" id="profileMenuLoggedIn" style="display:none;">
+          <div class="profile-menu-header">
+            <img class="profile-avatar-large" id="userProfilePicture" src="" alt="Profile" />
+            <div class="profile-info">
+              <div class="profile-name" id="userDisplayName">User Name</div>
+              <div class="profile-email" id="userEmail">user@example.com</div>
+            </div>
+          </div>
+          <div class="profile-menu-actions">
+            <button class="profile-menu-item-btn" id="btnBackupToDrive">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span>Backup to Drive</span>
+            </button>
+            <button class="profile-menu-item-btn logout" id="btnLogoutGoogle">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+              <span>Sign Out</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════
+         MODAL: ADD ACCOUNT (Manual)
+    ═══════════════════════════════════════ -->
+    <div class="modal-overlay" id="modalAddAccount">
+      <div class="modal">
+        <div class="modal-drag-handle"></div>
+        <div class="modal-header">
+          <span class="modal-title">Add Account</span>
+          <button class="modal-close" id="closeModalAdd">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Service / Issuer</label>
+            <input type="text" class="form-input" id="addIssuer" placeholder="e.g. GitHub, Google, AWS" autocomplete="off"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Account / Email</label>
+            <input type="text" class="form-input" id="addAccount" placeholder="user@example.com" autocomplete="off"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Secret Key (Base32)</label>
+            <input type="text" class="form-input" id="addSecret" placeholder="JBSWY3DPEHPK3PXP" autocomplete="off" style="font-family:'JetBrains Mono',monospace;letter-spacing:1px;"/>
+            <div class="form-error" id="addSecretError">Invalid secret key. Must be Base32 encoded.</div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Algorithm</label>
+              <select class="form-select" id="addAlgorithm">
+                <option value="SHA1" selected>SHA-1 (default)</option>
+                <option value="SHA256">SHA-256</option>
+                <option value="SHA512">SHA-512</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Digits</label>
+              <select class="form-select" id="addDigits">
+                <option value="6" selected>6 digits</option>
+                <option value="8">8 digits</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Period (seconds)</label>
+            <select class="form-select" id="addPeriod">
+              <option value="30" selected>30 seconds</option>
+              <option value="60">60 seconds</option>
+            </select>
+          </div>
+          <button class="btn btn-primary btn-full" id="btnAddAccountSubmit">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;"><path d="M20 6L9 17l-5-5"/></svg>
+            Add Account
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════
+         MODAL: EDIT ACCOUNT
+    ═══════════════════════════════════════ -->
+    <div class="modal-overlay" id="modalEditAccount">
+      <div class="modal">
+        <div class="modal-drag-handle"></div>
+        <div class="modal-header">
+          <span class="modal-title">Edit Account</span>
+          <button class="modal-close" id="closeModalEdit">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="editAccountId" />
+          <div class="form-group">
+            <label class="form-label">Service / Issuer</label>
+            <input type="text" class="form-input" id="editIssuer" placeholder="e.g. GitHub" autocomplete="off"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Account / Email</label>
+            <input type="text" class="form-input" id="editAccountName" placeholder="user@example.com" autocomplete="off"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Secret Key</label>
+            <div style="position:relative;">
+              <input type="password" class="form-input" id="editSecret" style="font-family:'JetBrains Mono',monospace;padding-right:40px;"/>
+              <button id="toggleSecretVisibility" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);display:flex;align-items:center;" title="Show/hide secret">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Algorithm</label>
+              <select class="form-select" id="editAlgorithm">
+                <option value="SHA1">SHA-1</option>
+                <option value="SHA256">SHA-256</option>
+                <option value="SHA512">SHA-512</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Digits</label>
+              <select class="form-select" id="editDigits">
+                <option value="6">6 digits</option>
+                <option value="8">8 digits</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-full" id="btnEditAccountSubmit">Save Changes</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════
+         MODAL: DELETE CONFIRM
+    ═══════════════════════════════════════ -->
+    <div class="modal-overlay modal-center" id="modalDeleteConfirm">
+      <div class="modal">
+        <div class="confirm-dialog">
+          <div class="confirm-icon">🗑️</div>
+          <div class="confirm-title">Delete Account?</div>
+          <div class="confirm-text" id="deleteConfirmText">
+            This will permanently remove the account and its TOTP secret. This action cannot be undone.
+          </div>
+          <div class="confirm-actions">
+            <button class="btn btn-ghost" id="btnDeleteCancel">Cancel</button>
+            <button class="btn btn-danger" id="btnDeleteConfirm">Delete</button>
+          </div>
+        </div>
+        <input type="hidden" id="deleteAccountId" />
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════
+         MODAL: SETTINGS
+    ═══════════════════════════════════════ -->
+    <div class="modal-overlay" id="modalSettings">
+      <div class="modal">
+        <div class="modal-drag-handle"></div>
+        <div class="modal-header">
+          <span class="modal-title">Settings</span>
+          <button class="modal-close" id="closeModalSettings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Security Section -->
+        <div class="settings-section">
+          <div class="settings-section-title">Security</div>
+
+          <!-- PIN Protection Toggle -->
+          <div class="settings-item">
+            <div class="settings-item-left">
+              <div class="settings-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              </div>
+              <div>
+                <div class="settings-item-title">PIN Protection</div>
+                <div class="settings-item-sub">Require PIN to unlock</div>
+              </div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="pinProtectionToggle"/>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <!-- Change PIN (only visible when PIN enabled) -->
+          <button class="settings-item" id="btnChangePIN" style="width:100%;text-align:left; display:none;" aria-label="Change PIN">
+            <div class="settings-item-left" style="pointer-events:none;">
+              <div class="settings-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              </div>
+              <div>
+                <div class="settings-item-title">Change PIN</div>
+                <div class="settings-item-sub">Update your security PIN</div>
+              </div>
+            </div>
+            <div class="settings-chevron" style="pointer-events:none;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </button>
+
+          <!-- PIN Warning when disabled -->
+          <div class="settings-warning" id="pinDisabledWarning" style="display:none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0;">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span>Without PIN, your data is protected by device key only</span>
+          </div>
+
+          <div class="settings-item" id="autoLockItem" style="display:none;">
+            <div class="settings-item-left">
+              <div class="settings-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <div>
+                <div class="settings-item-title">Auto-lock Timer</div>
+                <div class="settings-item-sub">Lock after inactivity</div>
+              </div>
+            </div>
+            <select class="form-select" id="autoLockSelect" style="width:120px;">
+              <option value="1">1 minute</option>
+              <option value="3">3 minutes</option>
+              <option value="5" selected>5 minutes</option>
+              <option value="10">10 minutes</option>
+              <option value="15">15 minutes</option>
+              <option value="0">Never</option>
+            </select>
+          </div>
+
+          <div class="settings-item">
+            <div class="settings-item-left">
+              <div class="settings-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </div>
+              <div>
+                <div class="settings-item-title">Privacy Mode</div>
+                <div class="settings-item-sub">Blur codes until hover</div>
+              </div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="privacyModeToggle"/>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="divider" style="margin:0 20px;"></div>
+
+        <!-- Appearance Section -->
+        <div class="settings-section">
+          <div class="settings-section-title">Appearance</div>
+
+          <div class="settings-item">
+            <div class="settings-item-left">
+              <div class="settings-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+              </div>
+              <div>
+                <div class="settings-item-title">Accent Color</div>
+                <div class="settings-item-sub">UI highlight color</div>
+              </div>
+            </div>
+            <div class="color-picker-container" id="accentColorPicker">
+              <div class="color-swatch active" data-color="#00E5FF" style="background:#00E5FF;" title="Cyan"></div>
+              <div class="color-swatch" data-color="#FF3B3B" style="background:#FF3B3B;" title="Red"></div>
+              <div class="color-swatch" data-color="#FFD60A" style="background:#FFD60A;" title="Yellow"></div>
+              <div class="color-swatch" data-color="#30D158" style="background:#30D158;" title="Green"></div>
+              <div class="color-swatch" data-color="#7B3FE4" style="background:#7B3FE4;" title="Purple"></div>
+              <div class="color-swatch" data-color="#FFFFFF" style="background:#FFFFFF;" title="White"></div>
+            </div>
+          </div>
+
+          <div class="settings-item">
+            <div class="settings-item-left">
+              <div class="settings-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+              </div>
+              <div>
+                <div class="settings-item-title">Compact Layout</div>
+                <div class="settings-item-sub">Smaller cards, more visible</div>
+              </div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="compactLayoutToggle"/>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="divider" style="margin:0 20px;"></div>
+
+        <!-- Behavior Section -->
+        <div class="settings-section">
+          <div class="settings-section-title">Behavior</div>
+
+          <div class="settings-item">
+            <div class="settings-item-left">
+              <div class="settings-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+              </div>
+              <div>
+                <div class="settings-item-title">Close After Copy</div>
+                <div class="settings-item-sub">Auto-close popup after copying</div>
+              </div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="closeAfterCopyToggle" checked/>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <div class="settings-item">
+            <div class="settings-item-left">
+              <div class="settings-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </div>
+              <div>
+                <div class="settings-item-title">Auto-focus Search</div>
+                <div class="settings-item-sub">Focus search bar on open</div>
+              </div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="autoFocusSearchToggle" checked/>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="divider" style="margin:0 20px;"></div>
+
+        <!-- Data Section -->
+        <div class="settings-section">
+          <div class="settings-section-title">Data</div>
+
+          <button class="settings-item" id="btnExportData" style="width:100%;text-align:left;">
+            <div class="settings-item-left">
+              <div class="settings-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </div>
+              <div>
+                <div class="settings-item-title">Export Backup</div>
+                <div class="settings-item-sub">Download encrypted backup file</div>
+              </div>
+            </div>
+            <div class="settings-chevron">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </button>
+
+          <!-- Backup to Drive (shown when logged in) -->
+          <button class="settings-item" id="btnBackupDriveSettings" style="width:100%;text-align:left; display:none;">
+            <div class="settings-item-left">
+              <div class="settings-icon" style="color:#4285F4;">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+              </div>
+              <div>
+                <div class="settings-item-title">Backup to Google Drive</div>
+                <div class="settings-item-sub">Save your data to the cloud</div>
+              </div>
+            </div>
+            <div class="settings-chevron">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </button>
+
+          <label class="settings-item" for="importFileInput" style="cursor:pointer;">
+            <div class="settings-item-left">
+              <div class="settings-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              </div>
+              <div>
+                <div class="settings-item-title">Import Backup</div>
+                <div class="settings-item-sub">Restore from backup file</div>
+              </div>
+            </div>
+            <div class="settings-chevron">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </label>
+          <input type="file" id="importFileInput" accept=".json" style="display:none;" />
+
+          <button class="settings-item" id="btnLockNow" style="width:100%;text-align:left;">
+            <div class="settings-item-left">
+              <div class="settings-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              </div>
+              <div>
+                <div class="settings-item-title">Lock Now</div>
+                <div class="settings-item-sub">Lock the app immediately</div>
+              </div>
+            </div>
+            <div class="settings-chevron">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </button>
+
+          <button class="settings-item" id="btnDeleteAll" style="width:100%;text-align:left;">
+            <div class="settings-item-left">
+              <div class="settings-icon" style="color:var(--totp-danger)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+              </div>
+              <div>
+                <div class="settings-item-title" style="color:var(--totp-danger)">Delete All Data</div>
+                <div class="settings-item-sub">Permanently erase all accounts</div>
+              </div>
+            </div>
+            <div class="settings-chevron" style="color:var(--totp-danger)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </button>
+        </div>
+
+        <div style="padding:16px 20px 0;">
+          <div style="font-size:11px;color:var(--text-muted);text-align:center;">Azkura Auth v1.0.0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════
+         MODAL: EXPORT PASSWORD
+    ═══════════════════════════════════════ -->
+    <div class="modal-overlay modal-center" id="modalExportPassword">
+      <div class="modal">
+        <div class="modal-header">
+          <span class="modal-title">Export Backup</span>
+          <button class="modal-close" id="closeModalExport">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div style="font-size:12px;color:var(--text-secondary);line-height:1.6;">
+            Set a password to encrypt your backup. You'll need this password to restore the backup.
+          </div>
+          <div class="form-group">
+            <label class="form-label">Backup Password</label>
+            <input type="password" class="form-input" id="exportPassword" placeholder="Choose a strong password"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Confirm Password</label>
+            <input type="password" class="form-input" id="exportPasswordConfirm" placeholder="Repeat the password"/>
+            <div class="form-error" id="exportPasswordError">Passwords do not match</div>
+          </div>
+          <button class="btn btn-primary btn-full" id="btnExportConfirm">Export Backup</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════
+         MODAL: IMPORT PASSWORD
+    ═══════════════════════════════════════ -->
+    <div class="modal-overlay modal-center" id="modalImportPassword">
+      <div class="modal">
+        <div class="modal-header">
+          <span class="modal-title">Import Backup</span>
+          <button class="modal-close" id="closeModalImport">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div style="font-size:12px;color:var(--text-secondary);line-height:1.6;" id="importFileInfo">
+            Enter the password used when this backup was exported.
+          </div>
+          <div class="form-group">
+            <label class="form-label">Backup Password</label>
+            <input type="password" class="form-input" id="importPassword" placeholder="Backup file password"/>
+            <div class="form-error" id="importPasswordError"></div>
+          </div>
+          <button class="btn btn-primary btn-full" id="btnImportConfirm">Import</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════
+         MODAL: DELETE ALL CONFIRM
+    ═══════════════════════════════════════ -->
+    <div class="modal-overlay modal-center" id="modalDeleteAll">
+      <div class="modal">
+        <div class="confirm-dialog">
+          <div class="confirm-icon">⚠️</div>
+          <div class="confirm-title">Delete All Data?</div>
+          <div class="confirm-text">
+            This will permanently delete ALL accounts and reset the app. This cannot be undone. Type <strong style="color:var(--totp-danger);">DELETE</strong> to confirm.
+          </div>
+          <input type="text" class="form-input" id="deleteAllConfirmInput" placeholder="Type DELETE to confirm" style="width:100%;text-align:center;"/>
+          <div class="confirm-actions">
+            <button class="btn btn-ghost" id="btnDeleteAllCancel">Cancel</button>
+            <button class="btn btn-danger" id="btnDeleteAllConfirm" disabled>Delete Everything</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════
+         MODAL: CHANGE PIN
+    ═══════════════════════════════════════ -->
+    <div class="modal-overlay modal-center" id="modalChangePin">
+      <div class="modal">
+        <div class="modal-header">
+          <span class="modal-title">Change PIN</span>
+          <button class="modal-close" id="closeModalChangePin">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Current PIN</label>
+            <input type="password" class="form-input" id="currentPin" placeholder="••••••" maxlength="6" inputmode="numeric"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">New PIN</label>
+            <input type="password" class="form-input" id="newPin" placeholder="••••••" maxlength="6" inputmode="numeric"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Confirm New PIN</label>
+            <input type="password" class="form-input" id="confirmNewPin" placeholder="••••••" maxlength="6" inputmode="numeric"/>
+            <div class="form-error" id="changePinError"></div>
+          </div>
+          <button class="btn btn-primary btn-full" id="btnChangePinConfirm">Update PIN</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end #app -->
+
+</body>
+</html>

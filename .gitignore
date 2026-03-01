@@ -1,0 +1,5 @@
+# abaikan file .idx
+.idx
+
+# abaikan log
+*.log
