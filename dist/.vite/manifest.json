@@ -31,7 +31,7 @@
     "isDynamicEntry": true
   },
   "src/popup/index.html": {
-    "file": "assets/popup-DmnBY378.js",
+    "file": "assets/popup-cog5L2S-.js",
     "name": "popup",
     "src": "src/popup/index.html",
     "isEntry": true,
@@ -41,7 +41,7 @@
       "src/core/uri-parser.js"
     ],
     "css": [
-      "assets/popup-DUkmuCJZ.css"
+      "assets/popup-bDPgK-2T.css"
     ],
     "assets": [
       "assets/icon128-BTwHR2_d.png"
