@@ -18,6 +18,7 @@ import {
   wipeAllData,
   exportBackup,
   importBackup,
+  restoreFromDriveBackup,
   getAccounts,
   searchAccounts,
   getServiceMeta,
@@ -1050,47 +1051,20 @@ async function downloadAndRestore(fileId, fileName) {
   // Close restore modal
   closeModal('#modalRestoreDrive');
   
-  // Show import password modal
-  $('#importPassword').value = '';
-  $('#importPasswordError').classList.remove('visible');
-  $('#importFileInfo').textContent = `File: ${fileName} from Google Drive. Enter the backup password.`;
-  
-  // Store data temporarily
-  const backupData = result.data;
-  const backupJson = JSON.stringify(backupData);
-  
-  // Override import button handler for Drive restore
-  const originalHandler = $('#btnImportConfirm').onclick;
-  $('#btnImportConfirm').onclick = async () => {
-    const pw = $('#importPassword').value;
-    const errEl = $('#importPasswordError');
-
-    if (!pw) {
-      errEl.textContent = 'Please enter the backup password';
-      errEl.classList.add('visible');
-      return;
-    }
-
-    try {
-      $('#btnImportConfirm').disabled = true;
-      const result = await importBackup(backupJson, pw, currentPassword);
-      currentAccounts = await getAccounts();
-      renderAccounts(currentAccounts);
-      closeModal('#modalImportPassword');
-      closeModal('#modalSettings');
-      showToast(`Restored ${result.imported} account(s) from Drive!`, 'success');
-      
-      // Restore original handler
-      $('#btnImportConfirm').onclick = originalHandler;
-    } catch (err) {
-      errEl.textContent = err.message;
-      errEl.classList.add('visible');
-    } finally {
-      $('#btnImportConfirm').disabled = false;
-    }
-  };
-  
-  openModal('#modalImportPassword');
+  try {
+    // Get vault password (PIN or default)
+    const vaultPw = currentPassword || await getDefaultKey();
+    
+    // Restore directly without password (Drive backup is not encrypted with user password)
+    const restoreResult = await restoreFromDriveBackup(result.data.accounts, vaultPw);
+    
+    currentAccounts = await getAccounts();
+    renderAccounts(currentAccounts);
+    closeModal('#modalSettings');
+    showToast(`Restored ${restoreResult.imported} account(s) from Drive!`, 'success');
+  } catch (err) {
+    showToast('Restore failed: ' + err.message, 'error');
+  }
 }
 
 // ─── Settings ─────────────────────────────────────────────────────────────────

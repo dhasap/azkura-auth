@@ -284,6 +284,36 @@ export async function importBackup(jsonString, importPassword, vaultPassword) {
 }
 
 /**
+ * Restore accounts from Google Drive backup (no password needed)
+ * @param {Array} accountsData - Accounts array from Drive backup
+ * @param {string} vaultPassword - Current vault password to encrypt
+ * @returns {Promise<{imported: number, total: number}>}
+ */
+export async function restoreFromDriveBackup(accountsData, vaultPassword) {
+  if (!Array.isArray(accountsData)) {
+    throw new Error('Invalid backup: accounts data is not an array');
+  }
+
+  const existing = await getAccounts();
+  const existingIds = new Set(existing.map(a => a.secret + a.account));
+
+  // Add accounts that don't already exist (by secret + account combo)
+  const newAccounts = accountsData.filter(a =>
+    !existingIds.has(a.secret + a.account)
+  );
+
+  const merged = [...existing, ...newAccounts.map(a => ({
+    ...a,
+    id: generateId(), // new ID to avoid collisions
+  }))];
+
+  await setSessionAccounts(merged);
+  await saveVault(vaultPassword);
+
+  return { imported: newAccounts.length, total: merged.length };
+}
+
+/**
  * Delete all accounts and reset vault
  * @param {string} password
  */
