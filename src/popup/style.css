@@ -219,11 +219,10 @@ input, textarea {
    Profile Menu
    ========================================================= */
 .profile-menu-overlay {
-  align-items: flex-start;
-  justify-content: flex-end;
-  padding-top: 50px;
-  padding-right: 8px;
-  background: transparent;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: var(--bg-overlay);
   pointer-events: none;
 }
 
