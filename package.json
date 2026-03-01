@@ -23,8 +23,6 @@
     "vite": "^7.3.1"
   },
   "dependencies": {
-    "@otplib/core": "^13.3.0",
-    "@otplib/plugin-thirty-two": "^12.0.1",
-    "otplib": "^13.3.0"
+    "otpauth": "^9.5.0"
   }
 }

@@ -1,16 +1,13 @@
 /**
  * TOTP (Time-based One-Time Password) implementation
- * Using otplib v13 for RFC 6238 compliant generation
+ * Using otpauth library for RFC 6238 compliant generation
  * Supports SHA1, SHA256, SHA512 algorithms
  */
 
-import { generate, verify, generateSecret, OTP } from 'otplib';
-
-// Create OTP instance for configuration
-const otp = new OTP();
+import * as OTPAuth from 'otpauth';
 
 /**
- * Generate a TOTP code using otplib v13
+ * Generate a TOTP code using otpauth
  * @param {string} secretBase32 - Base32 encoded secret (with or without spaces)
  * @param {object} options
  * @param {number} [options.digits=6] - Number of digits
@@ -34,13 +31,16 @@ export async function generateTOTP(secretBase32, options = {}) {
   }
 
   try {
-    const token = await generate({
-      secret: cleanSecret,
+    // Create TOTP instance
+    const totp = new OTPAuth.TOTP({
+      secret: OTPAuth.Secret.fromBase32(cleanSecret),
       digits,
       period,
-      algorithm: algorithm.toUpperCase(),
-      window: 1 // Allow 1 step window for time drift
+      algorithm,
     });
+
+    // Generate token
+    const token = totp.generate();
     return token;
   } catch (error) {
     console.error('[TOTP] Generation error:', error);
@@ -66,15 +66,15 @@ export async function verifyTOTP(token, secret, options = {}) {
   const cleanSecret = secret.replace(/\s/g, '').toUpperCase();
 
   try {
-    const result = await verify({
-      secret: cleanSecret,
-      token,
+    const totp = new OTPAuth.TOTP({
+      secret: OTPAuth.Secret.fromBase32(cleanSecret),
       digits,
       period,
-      algorithm: algorithm.toUpperCase(),
-      window
+      algorithm,
     });
-    return result;
+
+    const result = totp.validate({ token, window });
+    return result !== null;
   } catch {
     return false;
   }
@@ -132,13 +132,53 @@ export function isValidSecret(secret) {
  * @returns {string}
  */
 export function generateRandomSecret(length = 32) {
-  return generateSecret();
+  const secret = new OTPAuth.Secret({ size: Math.ceil(length * 5 / 8) });
+  return secret.base32.substring(0, length);
 }
 
 /**
- * Get the OTP instance for advanced usage
- * @returns {OTP}
+ * Create otpauth URI for QR code generation
+ * @param {object} params
+ * @param {string} params.secret - Base32 secret
+ * @param {string} params.label - Account label (email)
+ * @param {string} [params.issuer='Azkura'] - Service name
+ * @param {number} [params.digits=6]
+ * @param {number} [params.period=30]
+ * @returns {string}
  */
-export function getOTPInstance() {
-  return otp;
+export function generateURI({ secret, label, issuer = 'Azkura', digits = 6, period = 30 }) {
+  const cleanSecret = secret.replace(/\s/g, '').toUpperCase();
+  
+  const totp = new OTPAuth.TOTP({
+    secret: OTPAuth.Secret.fromBase32(cleanSecret),
+    label,
+    issuer,
+    digits,
+    period,
+    algorithm: 'SHA1',
+  });
+
+  return totp.toString();
+}
+
+/**
+ * Parse otpauth URI
+ * @param {string} uri
+ * @returns {object|null}
+ */
+export function parseOtpauthURI(uri) {
+  try {
+    const totp = OTPAuth.URI.parse(uri);
+    return {
+      secret: totp.secret.base32,
+      label: totp.label,
+      issuer: totp.issuer,
+      digits: totp.digits,
+      period: totp.period,
+      algorithm: totp.algorithm,
+    };
+  } catch (error) {
+    console.error('[TOTP] Failed to parse URI:', error);
+    return null;
+  }
 }
