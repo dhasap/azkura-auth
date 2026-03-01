@@ -600,21 +600,16 @@ function initFAB() {
   $('#btnUploadQR').addEventListener('click', () => {
     menu.classList.remove('open');
     fab.classList.remove('open');
-    // Trigger file input
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) scanQRFromFile(file);
+    // Open scanner tab with upload tab active
+    chrome.tabs.create({ 
+      url: chrome.runtime.getURL('src/scanner/scanner.html?tab=upload') 
     });
-    input.click();
   });
 
   $('#btnScanQR').addEventListener('click', () => {
     menu.classList.remove('open');
     fab.classList.remove('open');
-    // Open scanner tab
+    // Open scanner tab with camera tab active
     chrome.tabs.create({ url: chrome.runtime.getURL('src/scanner/scanner.html') });
   });
 }

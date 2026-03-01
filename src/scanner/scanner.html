@@ -45,10 +45,42 @@
       line-height: 1.6;
       max-width: 380px;
     }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      background: var(--bg-card);
+      padding: 4px;
+      border-radius: 10px;
+    }
+    .tab {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      transition: all 0.15s ease;
+    }
+    .tab.active {
+      background: var(--accent);
+      color: #000;
+    }
+    .tab-content {
+      display: none;
+      width: 100%;
+      max-width: 400px;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    .tab-content.active {
+      display: flex;
+    }
     .video-wrapper {
       position: relative;
       width: 100%;
-      max-width: 400px;
       border-radius: 16px;
       overflow: hidden;
       border: 2px solid var(--border-subtle);
@@ -99,6 +131,35 @@
       50%  { top: 90%; opacity: 1; }
       100% { top: 5%; opacity: 1; }
     }
+    .upload-area {
+      width: 100%;
+      aspect-ratio: 1;
+      border: 2px dashed var(--border-subtle);
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .upload-area:hover {
+      border-color: var(--accent);
+      background: rgba(0,229,255,0.05);
+    }
+    .upload-icon {
+      font-size: 48px;
+    }
+    .upload-text {
+      font-size: 14px;
+      color: var(--text-secondary);
+      text-align: center;
+    }
+    .upload-hint {
+      font-size: 12px;
+      color: #666;
+    }
     .status-text {
       font-size: 14px;
       color: var(--text-secondary);
@@ -143,6 +204,7 @@
     }
     .permission-error.visible { display: flex; }
     .permission-icon { font-size: 48px; }
+    #fileInput { display: none; }
   </style>
 </head>
 <body>
@@ -156,32 +218,52 @@
   </div>
 
   <h2>Scan QR Code</h2>
-  <p class="subtitle">Point the camera at a TOTP QR code to scan it automatically</p>
+  <p class="subtitle">Scan or upload a TOTP QR code to add an account</p>
 
-  <div class="video-wrapper" id="videoWrapper">
-    <video id="video" autoplay playsinline muted></video>
-    <canvas id="canvas"></canvas>
-    <div class="scan-overlay">
-      <div class="scan-frame">
-        <div class="scan-corner tl"></div>
-        <div class="scan-corner tr"></div>
-        <div class="scan-corner bl"></div>
-        <div class="scan-corner br"></div>
-        <div class="scan-line"></div>
-      </div>
-    </div>
+  <div class="tabs">
+    <button class="tab active" id="tabCamera" onclick="switchTab('camera')">Camera</button>
+    <button class="tab" id="tabUpload" onclick="switchTab('upload')">Upload Image</button>
   </div>
 
-  <div class="status-text" id="statusText">Initializing camera...</div>
-
-  <div class="permission-error" id="permissionError">
-    <div class="permission-icon">📷</div>
-    <div>
-      <strong>Camera access denied</strong><br/>
-      <span style="font-size:13px;color:#888;">Please allow camera access and try again, or close this tab and use "Upload QR Image" instead.</span>
+  <!-- Camera Tab -->
+  <div class="tab-content active" id="contentCamera">
+    <div class="video-wrapper" id="videoWrapper">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="canvas"></canvas>
+      <div class="scan-overlay">
+        <div class="scan-frame">
+          <div class="scan-corner tl"></div>
+          <div class="scan-corner tr"></div>
+          <div class="scan-corner bl"></div>
+          <div class="scan-corner br"></div>
+          <div class="scan-line"></div>
+        </div>
+      </div>
     </div>
-    <button class="btn btn-primary" onclick="startScanner()">Retry</button>
-    <button class="btn btn-ghost" onclick="window.close()">Close</button>
+
+    <div class="permission-error" id="permissionError">
+      <div class="permission-icon">📷</div>
+      <div>
+        <strong>Camera access denied</strong><br/>
+        <span style="font-size:13px;color:#888;">Please allow camera access or switch to Upload Image tab</span>
+      </div>
+      <button class="btn btn-primary" onclick="startScanner()">Retry Camera</button>
+    </div>
+
+    <div class="status-text" id="statusTextCamera">Initializing camera...</div>
+  </div>
+
+  <!-- Upload Tab -->
+  <div class="tab-content" id="contentUpload">
+    <div class="upload-area" id="uploadArea">
+      <div class="upload-icon">📁</div>
+      <div class="upload-text">
+        <strong>Click to upload QR image</strong><br/>
+        <span class="upload-hint">PNG, JPG up to 5MB</span>
+      </div>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" />
+    <div class="status-text" id="statusTextUpload">Select an image with QR code</div>
   </div>
 
   <div class="btn-row">

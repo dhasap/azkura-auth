@@ -20,7 +20,7 @@
     "isEntry": true
   },
   "src/popup/index.html": {
-    "file": "assets/popup-Ykkfc1ln.js",
+    "file": "assets/popup-C_TC93rb.js",
     "name": "popup",
     "src": "src/popup/index.html",
     "isEntry": true,
@@ -28,14 +28,14 @@
       "_modulepreload-polyfill-B5Qt9EMX.js"
     ],
     "css": [
-      "assets/popup-vOaZwCeh.css"
+      "assets/popup-CCdglW1d.css"
     ],
     "assets": [
       "assets/icon128-BTwHR2_d.png"
     ]
   },
   "src/scanner/scanner.html": {
-    "file": "assets/scanner-BKN1U8JC.js",
+    "file": "assets/scanner-CyKHrveN.js",
     "name": "scanner",
     "src": "src/scanner/scanner.html",
     "isEntry": true,
