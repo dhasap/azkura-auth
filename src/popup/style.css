@@ -478,6 +478,17 @@ input, textarea {
   color: var(--text-primary);
 }
 
+.service-icon.has-logo {
+  padding: 6px;
+  background: white !important;
+}
+
+.service-icon.has-logo svg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .account-info {
   flex: 1;
   min-width: 0;
@@ -1370,13 +1381,52 @@ input, textarea {
   background: var(--bg-card);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
-  cursor: pointer;
   transition: all var(--transition-fast);
+  position: relative;
 }
 
 .restore-file-item:hover {
   background: var(--bg-card-hover);
   border-color: var(--accent);
+}
+
+.restore-file-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.restore-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: none;
+  background: transparent;
+}
+
+.restore-btn-restore {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.restore-btn-restore:hover {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.restore-btn-delete {
+  color: var(--totp-danger);
+  background: rgba(255, 59, 59, 0.1);
+}
+
+.restore-btn-delete:hover {
+  background: var(--totp-danger);
+  color: white;
 }
 
 .restore-file-icon {
@@ -1419,4 +1469,131 @@ input, textarea {
 #modalSettings .modal-body {
   max-height: calc(85vh - 60px);
   overflow-y: auto;
+}
+
+/* =========================================================
+   Folder Management
+   ========================================================= */
+.folder-filter {
+  display: flex;
+  gap: 8px;
+  padding: 8px 16px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border-subtle);
+  scrollbar-width: none;
+}
+
+.folder-filter::-webkit-scrollbar {
+  display: none;
+}
+
+.folder-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.folder-chip:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.folder-chip.active {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  border-color: var(--accent);
+}
+
+.folder-chip-manage {
+  padding: 6px;
+}
+
+.folder-list {
+  display: flex;
+  gap: 8px;
+}
+
+.folder-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+}
+
+.folder-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.folder-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.folder-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.folder-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  transition: all var(--transition-fast);
+}
+
+.folder-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.folder-btn.delete:hover {
+  background: rgba(255, 59, 59, 0.1);
+  color: var(--totp-danger);
+}
+
+.move-folder-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.move-folder-item:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent);
+}
+
+.move-folder-item.selected {
+  background: var(--accent-dim);
+  border-color: var(--accent);
 }

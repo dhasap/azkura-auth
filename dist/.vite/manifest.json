@@ -20,7 +20,7 @@
     "isEntry": true
   },
   "src/popup/index.html": {
-    "file": "assets/popup-CzAmjUdg.js",
+    "file": "assets/popup-qmvL_I0J.js",
     "name": "popup",
     "src": "src/popup/index.html",
     "isEntry": true,
@@ -28,7 +28,7 @@
       "_modulepreload-polyfill-B5Qt9EMX.js"
     ],
     "css": [
-      "assets/popup-C30I6KLT.css"
+      "assets/popup-CFn5TRha.css"
     ],
     "assets": [
       "assets/icon128-BTwHR2_d.png"

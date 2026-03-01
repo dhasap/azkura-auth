@@ -7,7 +7,7 @@ import { generateTOTP, getRemainingSeconds, formatCode, isValidSecret } from '..
 import { setupPin, verifyPin, encrypt, getDefaultKey } from '../core/crypto.js';
 import { parseOtpauthURI } from '../core/uri-parser.js';
 import { isLoggedIn, loginGoogle, logoutGoogle, getUserProfile, refreshUserProfile } from '../core/google-auth.js';
-import { uploadBackupToDrive, listBackupsFromDrive, downloadBackupFromDrive } from '../core/google-drive.js';
+import { uploadBackupToDrive, listBackupsFromDrive, downloadBackupFromDrive, deleteBackupFromDrive } from '../core/google-drive.js';
 import {
   unlockVault,
   lockVault,
@@ -36,6 +36,10 @@ import {
   setPreference,
   setPreferences,
   getSessionAccounts,
+  getFolders,
+  createFolder,
+  deleteFolder,
+  moveAccountToFolder,
 } from '../core/storage.js';
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -46,6 +50,8 @@ let prefs = {};
 let pendingImportFile = null;
 let createPinValue = null;
 let googleUser = null;
+let currentFolderFilter = 'all'; // 'all', 'uncategorized', or folderId
+let folders = [];
 
 // ─── DOM helpers ─────────────────────────────────────────────────────────────
 const $ = (sel) => document.querySelector(sel);
@@ -382,7 +388,12 @@ function createAccountCard(account) {
   const iconEl = document.createElement('div');
   iconEl.className = 'service-icon';
   iconEl.style.background = meta.bg;
-  if (meta.emoji) {
+  
+  if (meta.hasLogo && meta.svg) {
+    // Use SVG logo
+    iconEl.innerHTML = meta.svg;
+    iconEl.classList.add('has-logo');
+  } else if (meta.emoji) {
     iconEl.textContent = meta.emoji;
   } else {
     const letter = document.createElement('span');
@@ -421,6 +432,9 @@ function createAccountCard(account) {
   const actionsEl = document.createElement('div');
   actionsEl.className = 'card-actions';
   actionsEl.innerHTML = `
+    <button class="card-action-btn" data-action="folder" title="Move to folder">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+    </button>
     <button class="card-action-btn" data-action="edit" title="Edit">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
     </button>
@@ -446,6 +460,7 @@ function createAccountCard(account) {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
     e.stopPropagation();
+    if (btn.dataset.action === 'folder') openMoveToFolderModal(account.id);
     if (btn.dataset.action === 'edit') openEditModal(account.id);
     if (btn.dataset.action === 'delete') openDeleteModal(account.id, account.issuer, account.account);
   });
@@ -484,6 +499,11 @@ async function copyCode(accountId, codeEl, flashEl, cardEl) {
 async function loadMainView() {
   prefs = await getPreferences();
   applyPreferences();
+  
+  // Load folders
+  await loadFolders();
+  await renderFolderChips();
+  
   currentAccounts = await getAccounts();
   renderAccounts(currentAccounts);
   startTick();
@@ -500,19 +520,30 @@ function renderAccounts(accounts) {
   const list = $('#accountsList');
   list.innerHTML = '';
 
-  if (!accounts || accounts.length === 0) {
+  // Filter by folder
+  let filteredAccounts = accounts;
+  if (currentFolderFilter === 'uncategorized') {
+    filteredAccounts = accounts.filter(a => !a.folderId);
+  } else if (currentFolderFilter !== 'all') {
+    filteredAccounts = accounts.filter(a => a.folderId === currentFolderFilter);
+  }
+
+  if (!filteredAccounts || filteredAccounts.length === 0) {
     const query = $('#searchInput')?.value || '';
+    const folderName = currentFolderFilter === 'all' ? '' : 
+      currentFolderFilter === 'uncategorized' ? ' in Uncategorized' :
+      ' in this folder';
     list.innerHTML = `
       <div class="accounts-empty">
         <div class="accounts-empty-icon">${query ? '🔍' : '🔐'}</div>
-        <div class="accounts-empty-title">${query ? 'No results' : 'No accounts yet'}</div>
-        <div class="accounts-empty-sub">${query ? `No accounts match "${escHtml(query)}"` : 'Tap the + button to add your first TOTP account'}</div>
+        <div class="accounts-empty-title">${query ? 'No results' : 'No accounts'}</div>
+        <div class="accounts-empty-sub">${query ? `No accounts match "${escHtml(query)}"` : `No accounts${folderName} yet`}</div>
       </div>
     `;
     return;
   }
 
-  accounts.forEach(account => {
+  filteredAccounts.forEach(account => {
     const card = createAccountCard(account);
     list.appendChild(card);
   });
@@ -1027,13 +1058,34 @@ async function restoreFromDrive() {
         <div class="restore-file-name">${file.name}</div>
         <div class="restore-file-date">${date} ${size}</div>
       </div>
-      <div class="restore-file-size">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:var(--accent);">
-          <polyline points="9 18 15 12 9 6"/>
-        </svg>
+      <div class="restore-file-actions">
+        <button class="restore-btn restore-btn-restore" title="Restore this backup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </button>
+        <button class="restore-btn restore-btn-delete" title="Delete this backup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          </svg>
+        </button>
       </div>
     `;
-    item.addEventListener('click', () => downloadAndRestore(file.id, file.name));
+    
+    // Restore button
+    item.querySelector('.restore-btn-restore').addEventListener('click', (e) => {
+      e.stopPropagation();
+      downloadAndRestore(file.id, file.name);
+    });
+    
+    // Delete button
+    item.querySelector('.restore-btn-delete').addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteBackup(file.id, file.name, item);
+    });
+    
     container.appendChild(item);
   });
 }
@@ -1064,6 +1116,32 @@ async function downloadAndRestore(fileId, fileName) {
     showToast(`Restored ${restoreResult.imported} account(s) from Drive!`, 'success');
   } catch (err) {
     showToast('Restore failed: ' + err.message, 'error');
+  }
+}
+
+async function deleteBackup(fileId, fileName, element) {
+  if (!confirm(`Delete backup "${fileName}"?`)) return;
+  
+  showToast('Deleting backup...', 'info');
+  
+  const result = await deleteBackupFromDrive(fileId);
+  
+  if (result.success) {
+    // Remove element from list
+    element.style.opacity = '0';
+    element.style.transform = 'translateX(-20px)';
+    setTimeout(() => element.remove(), 300);
+    
+    showToast('Backup deleted', 'success');
+    
+    // Check if list is empty
+    const container = $('#restoreDriveFiles');
+    if (container.children.length === 0) {
+      $('#restoreDriveList').style.display = 'none';
+      $('#restoreDriveEmpty').style.display = 'block';
+    }
+  } else {
+    showToast('Delete failed: ' + result.error, 'error');
   }
 }
 
@@ -1388,6 +1466,182 @@ async function showPinSetupForEnable() {
   openModal('#modalChangePin');
 }
 
+// ─── Folder Management ─────────────────────────────────────────────────────────
+function initFolders() {
+  // Folder chip click handlers
+  $$('.folder-chip[data-folder]').forEach(chip => {
+    chip.addEventListener('click', () => {
+      $$('.folder-chip[data-folder]').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentFolderFilter = chip.dataset.folder;
+      renderAccounts(currentAccounts);
+    });
+  });
+
+  // Manage folders button
+  $('#btnManageFolders').addEventListener('click', () => {
+    openManageFoldersModal();
+  });
+
+  // Close modal handlers
+  $('#closeModalFolders').addEventListener('click', () => closeModal('#modalManageFolders'));
+  $('#closeModalMoveFolder').addEventListener('click', () => closeModal('#modalMoveToFolder'));
+  $('#modalManageFolders').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeModal('#modalManageFolders');
+  });
+  $('#modalMoveToFolder').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeModal('#modalMoveToFolder');
+  });
+
+  // Create folder
+  $('#btnCreateFolder').addEventListener('click', async () => {
+    const name = $('#newFolderName').value.trim();
+    if (!name) {
+      showToast('Please enter a folder name', 'error');
+      return;
+    }
+    
+    const selectedColor = $('#folderColorPicker .color-swatch.active');
+    const color = selectedColor ? selectedColor.dataset.color : '#00E5FF';
+    
+    await createFolder(name, color);
+    $('#newFolderName').value = '';
+    await loadFolders();
+    await renderFolderChips();
+    showToast('Folder created!', 'success');
+  });
+
+  // Color picker
+  $('#folderColorPicker')?.addEventListener('click', (e) => {
+    if (e.target.classList.contains('color-swatch')) {
+      $$('#folderColorPicker .color-swatch').forEach(s => s.classList.remove('active'));
+      e.target.classList.add('active');
+    }
+  });
+}
+
+async function loadFolders() {
+  folders = await getFolders();
+}
+
+async function renderFolderChips() {
+  const container = $('#folderList');
+  if (!container) return;
+  
+  container.innerHTML = '';
+  
+  for (const folder of folders) {
+    const chip = document.createElement('button');
+    chip.className = 'folder-chip';
+    chip.dataset.folder = folder.id;
+    chip.innerHTML = `
+      <span style="width:8px;height:8px;border-radius:50%;background:${folder.color};"></span>
+      ${escHtml(folder.name)}
+    `;
+    chip.addEventListener('click', () => {
+      $$('.folder-chip[data-folder]').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentFolderFilter = folder.id;
+      renderAccounts(currentAccounts);
+    });
+    container.appendChild(chip);
+  }
+}
+
+async function openManageFoldersModal() {
+  await renderFoldersList();
+  openModal('#modalManageFolders');
+}
+
+async function renderFoldersList() {
+  const container = $('#foldersList');
+  const currentFolders = await getFolders();
+  
+  container.innerHTML = '';
+  
+  if (currentFolders.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:20px;">No folders yet</div>';
+    return;
+  }
+  
+  for (const folder of currentFolders) {
+    const item = document.createElement('div');
+    item.className = 'folder-item';
+    item.innerHTML = `
+      <div class="folder-dot" style="background:${folder.color};"></div>
+      <div class="folder-name">${escHtml(folder.name)}</div>
+      <div class="folder-actions">
+        <button class="folder-btn delete" title="Delete folder">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          </svg>
+        </button>
+      </div>
+    `;
+    
+    item.querySelector('.folder-btn.delete').addEventListener('click', async () => {
+      if (confirm(`Delete folder "${folder.name}"? Accounts will be uncategorized.`)) {
+        await deleteFolder(folder.id);
+        await renderFoldersList();
+        await renderFolderChips();
+        renderAccounts(currentAccounts);
+        showToast('Folder deleted', 'info');
+      }
+    });
+    
+    container.appendChild(item);
+  }
+}
+
+async function openMoveToFolderModal(accountId) {
+  const container = $('#moveFolderList');
+  const currentFolders = await getFolders();
+  const account = currentAccounts.find(a => a.id === accountId);
+  
+  container.innerHTML = '';
+  
+  // Add "Uncategorized" option
+  const uncategorized = document.createElement('div');
+  uncategorized.className = `move-folder-item ${!account?.folderId ? 'selected' : ''}`;
+  uncategorized.innerHTML = `
+    <div style="width:24px;height:24px;border-radius:50%;background:var(--border-medium);display:flex;align-items:center;justify-content:center;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+        <path d="M3 7v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2h-6l-2-2H5a2 2 0 0 0-2 2z"/>
+      </svg>
+    </div>
+    <div style="flex:1;">Uncategorized</div>
+  `;
+  uncategorized.addEventListener('click', async () => {
+    await moveAccountToFolder(accountId, null);
+    currentAccounts = await getAccounts();
+    renderAccounts(currentAccounts);
+    closeModal('#modalMoveToFolder');
+    showToast('Account moved', 'success');
+  });
+  container.appendChild(uncategorized);
+  
+  // Add folders
+  for (const folder of currentFolders) {
+    const item = document.createElement('div');
+    item.className = `move-folder-item ${account?.folderId === folder.id ? 'selected' : ''}`;
+    item.innerHTML = `
+      <div style="width:24px;height:24px;border-radius:50%;background:${folder.color};"></div>
+      <div style="flex:1;">${escHtml(folder.name)}</div>
+    `;
+    item.addEventListener('click', async () => {
+      await moveAccountToFolder(accountId, folder.id);
+      currentAccounts = await getAccounts();
+      renderAccounts(currentAccounts);
+      closeModal('#modalMoveToFolder');
+      showToast('Account moved', 'success');
+    });
+    container.appendChild(item);
+  }
+  
+  openModal('#modalMoveToFolder');
+}
+
 // ─── Initialization ───────────────────────────────────────────────────────────
 async function init() {
   // Initialize all components
@@ -1400,6 +1654,7 @@ async function init() {
   initDeleteModal();
   initSettings();
   initProfileMenu();
+  initFolders();
 
   // Determine initial view
   const firstTime = await isFirstTimeSetup();

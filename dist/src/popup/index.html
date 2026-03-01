@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=360, initial-scale=1.0" />
   <title>Azkura Auth</title>
-  <script type="module" crossorigin src="/assets/popup-CzAmjUdg.js"></script>
+  <script type="module" crossorigin src="/assets/popup-qmvL_I0J.js"></script>
   <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-B5Qt9EMX.js">
-  <link rel="stylesheet" crossorigin href="/assets/popup-C30I6KLT.css">
+  <link rel="stylesheet" crossorigin href="/assets/popup-CFn5TRha.css">
 </head>
 <body>
   <div id="app">
@@ -155,6 +155,18 @@
           <input type="text" class="search-input" id="searchInput" placeholder="Search accounts..." autocomplete="off" />
           <button class="search-clear" id="searchClear" title="Clear search">✕</button>
         </div>
+      </div>
+
+      <!-- Folder Filter -->
+      <div class="folder-filter" id="folderFilter">
+        <button class="folder-chip active" data-folder="all">All</button>
+        <button class="folder-chip" data-folder="uncategorized">Uncategorized</button>
+        <div class="folder-list" id="folderList"></div>
+        <button class="folder-chip folder-chip-manage" id="btnManageFolders">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+            <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+          </svg>
+        </button>
       </div>
 
       <!-- Accounts list -->
@@ -787,6 +799,64 @@
             <div id="restoreDriveFiles" style="display:flex;flex-direction:column;gap:8px;"></div>
           </div>
           <div id="restoreDriveError" class="form-error" style="display:none;text-align:center;margin-top:16px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════
+         MODAL: MANAGE FOLDERS
+    ═══════════════════════════════════════ -->
+    <div class="modal-overlay" id="modalManageFolders">
+      <div class="modal" style="max-height:80vh;display:flex;flex-direction:column;">
+        <div class="modal-header">
+          <span class="modal-title">Manage Folders</span>
+          <button class="modal-close" id="closeModalFolders">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body" style="overflow-y:auto;flex:1;">
+          <div id="foldersList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;"></div>
+          
+          <div class="divider" style="margin:16px 0;"></div>
+          
+          <div style="font-size:14px;font-weight:600;margin-bottom:12px;">Create New Folder</div>
+          <div class="form-group">
+            <label class="form-label">Folder Name</label>
+            <input type="text" class="form-input" id="newFolderName" placeholder="e.g. Work, Personal"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Color</label>
+            <div class="color-picker-container" id="folderColorPicker">
+              <div class="color-swatch active" data-color="#00E5FF" style="background:#00E5FF;"></div>
+              <div class="color-swatch" data-color="#FF3B3B" style="background:#FF3B3B;"></div>
+              <div class="color-swatch" data-color="#FFD60A" style="background:#FFD60A;"></div>
+              <div class="color-swatch" data-color="#30D158" style="background:#30D158;"></div>
+              <div class="color-swatch" data-color="#7B3FE4" style="background:#7B3FE4;"></div>
+              <div class="color-swatch" data-color="#FF9500" style="background:#FF9500;"></div>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-full" id="btnCreateFolder">Create Folder</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════
+         MODAL: MOVE TO FOLDER
+    ═══════════════════════════════════════ -->
+    <div class="modal-overlay modal-center" id="modalMoveToFolder">
+      <div class="modal">
+        <div class="modal-header">
+          <span class="modal-title">Move to Folder</span>
+          <button class="modal-close" id="closeModalMoveFolder">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div id="moveFolderList" style="display:flex;flex-direction:column;gap:8px;"></div>
         </div>
       </div>
     </div>

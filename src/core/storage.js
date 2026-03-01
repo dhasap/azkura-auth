@@ -184,3 +184,77 @@ export async function setPreferences(prefs) {
     chrome.storage.sync.set(prefs, resolve);
   });
 }
+
+// ─── Folder Management ──────────────────────────────────────────────────────
+
+/**
+ * Get all folders
+ * @returns {Promise<Array<{id: string, name: string, color: string}>>}
+ */
+export async function getFolders() {
+  const folders = await getSyncItem('folders');
+  return folders || [];
+}
+
+/**
+ * Save folders
+ * @param {Array} folders
+ */
+export async function saveFolders(folders) {
+  return setSyncItem('folders', folders);
+}
+
+/**
+ * Create a new folder
+ * @param {string} name
+ * @param {string} color
+ * @returns {Promise<{id: string, name: string, color: string}>}
+ */
+export async function createFolder(name, color = '#00E5FF') {
+  const folders = await getFolders();
+  const newFolder = {
+    id: 'folder_' + Date.now(),
+    name: name.trim(),
+    color
+  };
+  folders.push(newFolder);
+  await saveFolders(folders);
+  return newFolder;
+}
+
+/**
+ * Delete a folder
+ * @param {string} folderId
+ */
+export async function deleteFolder(folderId) {
+  const folders = await getFolders();
+  const filtered = folders.filter(f => f.id !== folderId);
+  await saveFolders(filtered);
+  
+  // Remove folderId from all accounts in this folder
+  const accounts = await getSessionItem('accounts') || [];
+  accounts.forEach(acc => {
+    if (acc.folderId === folderId) {
+      delete acc.folderId;
+    }
+  });
+  await setSessionItem('accounts', accounts);
+}
+
+/**
+ * Move account to folder
+ * @param {string} accountId
+ * @param {string|null} folderId
+ */
+export async function moveAccountToFolder(accountId, folderId) {
+  const accounts = await getSessionItem('accounts') || [];
+  const account = accounts.find(a => a.id === accountId);
+  if (account) {
+    if (folderId) {
+      account.folderId = folderId;
+    } else {
+      delete account.folderId;
+    }
+    await setSessionItem('accounts', accounts);
+  }
+}
