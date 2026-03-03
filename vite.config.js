@@ -10,6 +10,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         popup: 'src/popup/index.html',
+        app: 'src/app/index.html',
         scanner: 'src/scanner/scanner.html',
       },
     },

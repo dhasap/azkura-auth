@@ -12,7 +12,10 @@ import {
   setSessionAccounts,
   clearLocal,
   clearSession,
+  getFolders,
+  saveFolders,
 } from './storage.js';
+import { resetStats } from './stats.js';
 
 /**
  * Generate a unique ID
@@ -209,13 +212,16 @@ export async function exportBackup(exportPassword) {
  */
 export async function exportPlainBackup() {
   const accounts = await getAccounts();
+  const folders = await getFolders();
 
   const backup = {
     app: 'azkura-auth',
     version: '1.0.0',
     exportedAt: new Date().toISOString(),
     accountCount: accounts.length,
+    folderCount: folders.length,
     accounts, // Plain accounts array, no encryption
+    folders,  // Include folders in backup
   };
 
   return JSON.stringify(backup, null, 2);
@@ -270,7 +276,7 @@ export async function importBackup(jsonString, importPassword, vaultPassword) {
  * Import accounts from plain JSON backup (no encryption)
  * @param {string} jsonString - Content of backup file
  * @param {string} vaultPassword - Current vault password to encrypt
- * @returns {Promise<{imported: number, total: number}>}
+ * @returns {Promise<{imported: number, total: number, foldersImported: number}>}
  */
 export async function importPlainBackup(jsonString, vaultPassword) {
   let backup;
@@ -305,16 +311,33 @@ export async function importPlainBackup(jsonString, vaultPassword) {
   await setSessionAccounts(merged);
   await saveVault(vaultPassword);
 
-  return { imported: newAccounts.length, total: merged.length };
+  // Import folders if present in backup
+  let foldersImported = 0;
+  if (backup.folders && Array.isArray(backup.folders)) {
+    const existingFolders = await getFolders();
+    const existingFolderIds = new Set(existingFolders.map(f => f.id));
+    
+    // Add folders that don't already exist
+    for (const folder of backup.folders) {
+      if (!existingFolderIds.has(folder.id)) {
+        existingFolders.push(folder);
+        foldersImported++;
+      }
+    }
+    await saveFolders(existingFolders);
+  }
+
+  return { imported: newAccounts.length, total: merged.length, foldersImported };
 }
 
 /**
  * Restore accounts from Google Drive backup (no password needed)
  * @param {Array} accountsData - Accounts array from Drive backup
  * @param {string} vaultPassword - Current vault password to encrypt
- * @returns {Promise<{imported: number, total: number}>}
+ * @param {Array} [foldersData] - Optional folders array from Drive backup
+ * @returns {Promise<{imported: number, total: number, foldersImported: number}>}
  */
-export async function restoreFromDriveBackup(accountsData, vaultPassword) {
+export async function restoreFromDriveBackup(accountsData, vaultPassword, foldersData = null) {
   if (!Array.isArray(accountsData)) {
     throw new Error('Invalid backup: accounts data is not an array');
   }
@@ -335,7 +358,22 @@ export async function restoreFromDriveBackup(accountsData, vaultPassword) {
   await setSessionAccounts(merged);
   await saveVault(vaultPassword);
 
-  return { imported: newAccounts.length, total: merged.length };
+  // Import folders if present in backup
+  let foldersImported = 0;
+  if (foldersData && Array.isArray(foldersData)) {
+    const existingFolders = await getFolders();
+    const existingFolderIds = new Set(existingFolders.map(f => f.id));
+    
+    for (const folder of foldersData) {
+      if (!existingFolderIds.has(folder.id)) {
+        existingFolders.push(folder);
+        foldersImported++;
+      }
+    }
+    await saveFolders(existingFolders);
+  }
+
+  return { imported: newAccounts.length, total: merged.length, foldersImported };
 }
 
 /**
@@ -353,4 +391,5 @@ export async function deleteAllAccounts(password) {
 export async function wipeAllData() {
   await clearLocal();
   await clearSession();
+  await resetStats();
 }

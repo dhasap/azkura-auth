@@ -3,10 +3,97 @@
  * Handles backup/restore operations to Google Drive
  */
 
-import { getAuthToken } from './google-auth.js';
+import { getAuthToken, refreshUserProfile, logoutGoogle } from './google-auth.js';
+import { getFolders } from './storage.js';
 
 const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
 const DRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files';
+
+// Token refresh tracking to prevent infinite loops
+let isRefreshingToken = false;
+let tokenRefreshQueue = [];
+
+/**
+ * Handle token expiration by refreshing or prompting re-login
+ * @returns {Promise<boolean>} - true if token was refreshed successfully
+ */
+async function handleTokenExpiration() {
+  if (isRefreshingToken) {
+    // Wait for ongoing refresh
+    return new Promise((resolve) => {
+      tokenRefreshQueue.push(resolve);
+    });
+  }
+
+  isRefreshingToken = true;
+  
+  try {
+    // Try to refresh user profile (this will get a new token if possible)
+    const result = await refreshUserProfile();
+    
+    if (result.success) {
+      // Notify all waiting operations
+      tokenRefreshQueue.forEach(resolve => resolve(true));
+      tokenRefreshQueue = [];
+      return true;
+    } else {
+      // Refresh failed, need to re-login
+      await logoutGoogle();
+      tokenRefreshQueue.forEach(resolve => resolve(false));
+      tokenRefreshQueue = [];
+      return false;
+    }
+  } catch (error) {
+    console.error('[Google Drive] Token refresh failed:', error);
+    await logoutGoogle();
+    tokenRefreshQueue.forEach(resolve => resolve(false));
+    tokenRefreshQueue = [];
+    return false;
+  } finally {
+    isRefreshingToken = false;
+  }
+}
+
+/**
+ * Make authenticated request to Google Drive API with automatic token refresh
+ * @param {string} url - API URL
+ * @param {object} options - Fetch options
+ * @param {boolean} [retry=true] - Whether to retry on 401
+ * @returns {Promise<Response>}
+ */
+async function driveApiRequest(url, options = {}, retry = true) {
+  const token = await getAuthToken();
+  
+  if (!token) {
+    throw new Error('Not authenticated with Google');
+  }
+
+  const authOptions = {
+    ...options,
+    headers: {
+      ...options.headers,
+      'Authorization': `Bearer ${token}`
+    }
+  };
+
+  const response = await fetch(url, authOptions);
+
+  // Handle 401 Unauthorized - token expired
+  if (response.status === 401 && retry) {
+    console.log('[Google Drive] Token expired, attempting refresh...');
+    const refreshed = await handleTokenExpiration();
+    
+    if (refreshed) {
+      // Retry the request with new token
+      console.log('[Google Drive] Token refreshed, retrying request...');
+      return driveApiRequest(url, options, false); // Don't retry again
+    } else {
+      throw new Error('Session expired. Please sign in again.');
+    }
+  }
+
+  return response;
+}
 
 /**
  * Upload backup file to Google Drive
@@ -16,14 +103,12 @@ const DRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files';
  */
 export async function uploadBackupToDrive(accountsData, filename = null) {
   try {
-    const token = await getAuthToken();
-    if (!token) {
-      return { success: false, error: 'Not authenticated with Google' };
-    }
-
     // Generate filename with timestamp
     const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
     const fileName = filename || `azkura-backup-${timestamp}.json`;
+
+    // Get folders data
+    const foldersData = await getFolders();
 
     // Prepare backup data structure
     const backupData = {
@@ -31,7 +116,9 @@ export async function uploadBackupToDrive(accountsData, filename = null) {
       version: chrome.runtime.getManifest().version,
       exportedAt: new Date().toISOString(),
       accountCount: accountsData.length,
-      accounts: accountsData
+      folderCount: foldersData.length,
+      accounts: accountsData,
+      folders: foldersData
     };
 
     const fileContent = JSON.stringify(backupData, null, 2);
@@ -56,11 +143,10 @@ export async function uploadBackupToDrive(accountsData, filename = null) {
       fileContent +
       closeDelimiter;
 
-    // Upload to Drive
-    const response = await fetch(DRIVE_UPLOAD_URL, {
+    // Upload to Drive using authenticated request
+    const response = await driveApiRequest(DRIVE_UPLOAD_URL, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': `multipart/related; boundary="${boundary}"`
       },
       body: multipartRequestBody
@@ -95,19 +181,13 @@ export async function uploadBackupToDrive(accountsData, filename = null) {
  */
 export async function listBackupsFromDrive(maxResults = 10) {
   try {
-    const token = await getAuthToken();
-    if (!token) {
-      return { success: false, error: 'Not authenticated with Google' };
-    }
-
     // Search for Azkura Auth backup files
     const query = encodeURIComponent("name contains 'azkura-backup' and mimeType = 'application/json' and trashed = false");
     const url = `${DRIVE_FILES_URL}?q=${query}&pageSize=${maxResults}&orderBy=createdTime desc&fields=files(id,name,createdTime,size)`;
 
-    const response = await fetch(url, {
+    const response = await driveApiRequest(url, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Accept': 'application/json'
       }
     });
@@ -139,18 +219,10 @@ export async function listBackupsFromDrive(maxResults = 10) {
  */
 export async function downloadBackupFromDrive(fileId) {
   try {
-    const token = await getAuthToken();
-    if (!token) {
-      return { success: false, error: 'Not authenticated with Google' };
-    }
-
     const url = `${DRIVE_FILES_URL}/${fileId}?alt=media`;
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+    const response = await driveApiRequest(url, {
+      method: 'GET'
     });
 
     if (!response.ok) {
@@ -186,18 +258,10 @@ export async function downloadBackupFromDrive(fileId) {
  */
 export async function deleteBackupFromDrive(fileId) {
   try {
-    const token = await getAuthToken();
-    if (!token) {
-      return { success: false, error: 'Not authenticated with Google' };
-    }
-
     const url = `${DRIVE_FILES_URL}/${fileId}`;
 
-    const response = await fetch(url, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+    const response = await driveApiRequest(url, {
+      method: 'DELETE'
     });
 
     if (!response.ok && response.status !== 204) {

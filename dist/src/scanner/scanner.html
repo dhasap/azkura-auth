@@ -206,7 +206,7 @@
     .permission-icon { font-size: 48px; }
     #fileInput { display: none; }
   </style>
-  <script type="module" crossorigin src="/assets/scanner-DoHtBD6J.js"></script>
+  <script type="module" crossorigin src="/assets/scanner-BKLEPAfz.js"></script>
   <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-B5Qt9EMX.js">
 </head>
 <body>
@@ -223,8 +223,8 @@
   <p class="subtitle">Scan or upload a TOTP QR code to add an account</p>
 
   <div class="tabs">
-    <button class="tab active" id="tabCamera" onclick="switchTab('camera')">Camera</button>
-    <button class="tab" id="tabUpload" onclick="switchTab('upload')">Upload Image</button>
+    <button class="tab active" id="tabCamera">Camera</button>
+    <button class="tab" id="tabUpload">Upload Image</button>
   </div>
 
   <!-- Camera Tab -->
@@ -269,7 +269,7 @@
   </div>
 
   <div class="btn-row">
-    <button class="btn btn-ghost" onclick="window.close()">Close Tab</button>
+    <button class="btn btn-ghost" id="btnCloseTab">Back to App</button>
   </div>
 
 </body>

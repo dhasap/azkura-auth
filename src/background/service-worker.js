@@ -45,7 +45,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return false; // synchronous response
 });
 
-// ─── Clear badge on popup open ───────────────────────────────────────────────
+// ─── Handle mobile click (desktop uses popup) ────────────────────────────────
+// Note: This only fires if default_popup is NOT set in manifest
+// We keep it for potential future use or if popup is disabled
 chrome.action.onClicked.addListener(() => {
   chrome.action.setBadgeText({ text: '' });
 });

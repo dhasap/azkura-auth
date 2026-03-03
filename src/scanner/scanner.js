@@ -15,24 +15,38 @@ const uploadArea = document.getElementById('uploadArea');
 let stream = null;
 let scanActive = false;
 
-// Tab switching
+// Tab switching - Fixed for mobile
 window.switchTab = function(tabName) {
+  console.log('[Scanner] switchTab called:', tabName);
+  
   // Update tabs
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   
-  document.getElementById(`tab${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`).classList.add('active');
-  document.getElementById(`content${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`).classList.add('active');
+  const tabId = `tab${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`;
+  const contentId = `content${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`;
+  
+  console.log('[Scanner] Looking for elements:', tabId, contentId);
+  
+  const tabEl = document.getElementById(tabId);
+  const contentEl = document.getElementById(contentId);
+  
+  console.log('[Scanner] Found elements:', tabEl ? 'tab yes' : 'tab no', contentEl ? 'content yes' : 'content no');
+  
+  if (tabEl) tabEl.classList.add('active');
+  if (contentEl) contentEl.classList.add('active');
   
   // Stop camera if switching away
   if (tabName !== 'camera' && stream) {
     stream.getTracks().forEach(t => t.stop());
     stream = null;
     scanActive = false;
+    console.log('[Scanner] Camera stopped');
   }
   
   // Start camera if switching to camera
   if (tabName === 'camera' && !stream) {
+    console.log('[Scanner] Starting camera...');
     startScanner();
   }
 };
@@ -40,8 +54,8 @@ window.switchTab = function(tabName) {
 // Camera scanning
 window.startScanner = async function() {
   permissionError.classList.remove('visible');
-  videoWrapper.style.display = 'block';
-  statusTextCamera.textContent = 'Initializing camera...';
+  if (videoWrapper) videoWrapper.style.display = 'block';
+  if (statusTextCamera) statusTextCamera.textContent = 'Initializing camera...';
 
   try {
     stream = await navigator.mediaDevices.getUserMedia({
@@ -55,16 +69,21 @@ window.startScanner = async function() {
     video.srcObject = stream;
     await video.play();
     scanActive = true;
-    statusTextCamera.textContent = 'Scanning for QR code...';
+    if (statusTextCamera) {
+      statusTextCamera.textContent = 'Scanning for QR code...';
+      statusTextCamera.className = 'status-text';
+    }
     requestAnimationFrame(scanFrame);
   } catch (err) {
-    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-      statusTextCamera.textContent = '';
-      videoWrapper.style.display = 'none';
-      permissionError.classList.add('visible');
-    } else {
-      statusTextCamera.textContent = 'Camera error: ' + err.message;
-      statusTextCamera.className = 'status-text error';
+    if (statusTextCamera) {
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        statusTextCamera.textContent = '';
+        if (videoWrapper) videoWrapper.style.display = 'none';
+        permissionError.classList.add('visible');
+      } else {
+        statusTextCamera.textContent = 'Camera error: ' + err.message;
+        statusTextCamera.className = 'status-text error';
+      }
     }
   }
 };
@@ -106,37 +125,43 @@ async function scanFrame() {
 }
 
 // File upload handling
-uploadArea.addEventListener('click', () => fileInput.click());
+if (uploadArea) {
+  uploadArea.addEventListener('click', () => fileInput?.click());
 
-uploadArea.addEventListener('dragover', (e) => {
-  e.preventDefault();
-  uploadArea.style.borderColor = 'var(--accent)';
-  uploadArea.style.background = 'rgba(0,229,255,0.1)';
-});
+  uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadArea.style.borderColor = 'var(--accent)';
+    uploadArea.style.background = 'rgba(0,229,255,0.1)';
+  });
 
-uploadArea.addEventListener('dragleave', () => {
-  uploadArea.style.borderColor = '';
-  uploadArea.style.background = '';
-});
+  uploadArea.addEventListener('dragleave', () => {
+    uploadArea.style.borderColor = '';
+    uploadArea.style.background = '';
+  });
 
-uploadArea.addEventListener('drop', (e) => {
-  e.preventDefault();
-  uploadArea.style.borderColor = '';
-  uploadArea.style.background = '';
-  const file = e.dataTransfer.files[0];
-  if (file && file.type.startsWith('image/')) {
-    processImage(file);
-  }
-});
+  uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.style.borderColor = '';
+    uploadArea.style.background = '';
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      processImage(file);
+    }
+  });
+}
 
-fileInput.addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if (file) processImage(file);
-});
+if (fileInput) {
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) processImage(file);
+  });
+}
 
 async function processImage(file) {
-  statusTextUpload.textContent = 'Processing image...';
-  statusTextUpload.className = 'status-text';
+  if (statusTextUpload) {
+    statusTextUpload.textContent = 'Processing image...';
+    statusTextUpload.className = 'status-text';
+  }
 
   try {
     const img = new Image();
@@ -167,12 +192,16 @@ async function processImage(file) {
     if (qrData) {
       onQRFound(qrData, 'upload');
     } else {
-      statusTextUpload.textContent = '⚠ No QR code found in image';
-      statusTextUpload.className = 'status-text error';
+      if (statusTextUpload) {
+        statusTextUpload.textContent = '⚠ No QR code found in image';
+        statusTextUpload.className = 'status-text error';
+      }
     }
   } catch (err) {
-    statusTextUpload.textContent = 'Error: ' + err.message;
-    statusTextUpload.className = 'status-text error';
+    if (statusTextUpload) {
+      statusTextUpload.textContent = 'Error: ' + err.message;
+      statusTextUpload.className = 'status-text error';
+    }
   }
 }
 
@@ -186,89 +215,116 @@ async function onQRFound(data, source) {
   }
 
   // Validate it's an otpauth URI
-  if (!data.startsWith('otpauth://')) {
-    const msg = '⚠ QR code found, but not a valid TOTP code';
+  if (!data || !data.startsWith('otpauth://')) {
+    const msg = '⚠ QR code found, but not a valid TOTP code. Data: ' + (data ? data.substring(0, 50) : 'empty');
+    console.log('[Scanner] Invalid QR data:', data);
     if (source === 'camera') {
-      statusTextCamera.textContent = msg;
-      statusTextCamera.className = 'status-text error';
-      setTimeout(startScanner, 2000);
+      if (statusTextCamera) {
+        statusTextCamera.textContent = msg;
+        statusTextCamera.className = 'status-text error';
+      }
+      setTimeout(() => {
+        scanActive = true;
+        startScanner();
+      }, 3000);
     } else {
-      statusTextUpload.textContent = msg;
-      statusTextUpload.className = 'status-text error';
+      if (statusTextUpload) {
+        statusTextUpload.textContent = msg;
+        statusTextUpload.className = 'status-text error';
+      }
     }
     return;
   }
+  
+  // Show raw data for debugging
+  console.log('[Scanner] QR Data:', data.substring(0, 100));
 
-  // Parse the QR data and add account directly
-  try {
-    // Import the parser dynamically
-    const { parseOtpauthURI } = await import('../core/uri-parser.js');
-    const parsed = parseOtpauthURI(data);
-    
-    if (!parsed || !parsed.secret) {
-      throw new Error('Invalid TOTP data');
-    }
-
-    // Import accounts module
-    const { addAccount, getDefaultKey } = await import('../core/accounts.js');
-    
-    // Add the account (using default key since we're not in popup context)
-    const defaultKey = await getDefaultKey();
-    await addAccount({
-      issuer: parsed.issuer || '',
-      account: parsed.account || '',
-      secret: parsed.secret,
-      algorithm: parsed.algorithm || 'SHA1',
-      digits: parsed.digits || 6,
-      period: parsed.period || 30
-    }, defaultKey);
-
-    // Show success message
-    if (source === 'camera') {
-      statusTextCamera.textContent = '✓ Account added! Closing...';
+  // Show success immediately
+  if (source === 'camera') {
+    if (statusTextCamera) {
+      statusTextCamera.textContent = '✓ QR code found! Processing...';
       statusTextCamera.className = 'status-text success';
-    } else {
-      statusTextUpload.textContent = '✓ Account added! Closing...';
+    }
+  } else {
+    if (statusTextUpload) {
+      statusTextUpload.textContent = '✓ QR code found! Processing...';
       statusTextUpload.className = 'status-text success';
     }
+  }
 
-    // Alert user and close tab (important for mobile)
+  // Save to storage first, then redirect back
+  try {
+    // Store QR data temporarily
+    await chrome.storage.session.set({ pendingQR: data });
+    
+    // Show success message
     setTimeout(() => {
-      alert('✅ Akun berhasil ditambahkan!');
-      window.close();
-    }, 500);
+      if (source === 'camera') {
+        if (statusTextCamera) statusTextCamera.textContent = '✓ Account saved! Redirecting...';
+      } else {
+        if (statusTextUpload) statusTextUpload.textContent = '✓ Account saved! Redirecting...';
+      }
+      
+      // Redirect back to app after short delay
+      setTimeout(() => {
+        const appUrl = chrome.runtime.getURL('src/app/index.html');
+        window.location.href = appUrl;
+      }, 800);
+    }, 300);
     
   } catch (error) {
-    console.error('Failed to add account:', error);
-    
-    // Fallback: send message to popup if direct add fails
-    chrome.runtime.sendMessage({ type: 'QR_SCANNED', data });
+    console.error('Failed to process QR:', error);
     
     if (source === 'camera') {
-      statusTextCamera.textContent = '✓ Account saved! Closing...';
-      statusTextCamera.className = 'status-text success';
+      if (statusTextCamera) {
+        statusTextCamera.textContent = '✗ Failed to save: ' + error.message;
+        statusTextCamera.className = 'status-text error';
+      }
+      setTimeout(() => {
+        scanActive = true;
+        startScanner();
+      }, 2000);
     } else {
-      statusTextUpload.textContent = '✓ Account saved! Closing...';
-      statusTextUpload.className = 'status-text success';
+      if (statusTextUpload) {
+        statusTextUpload.textContent = '✗ Failed to save: ' + error.message;
+        statusTextUpload.className = 'status-text error';
+      }
     }
-    
-    // Alert and close even on fallback
-    setTimeout(() => {
-      alert('✅ Akun berhasil ditambahkan!');
-      window.close();
-    }, 500);
   }
 }
 
 // Check URL params for initial tab
 const urlParams = new URLSearchParams(window.location.search);
 const initialTab = urlParams.get('tab');
-if (initialTab === 'upload') {
+
+// Close/Back button handler
+document.getElementById('btnCloseTab')?.addEventListener('click', () => {
+  const appUrl = chrome.runtime.getURL('src/app/index.html');
+  window.location.href = appUrl;
+});
+
+// Tab button handlers
+document.getElementById('tabCamera')?.addEventListener('click', () => {
+  console.log('[Scanner] Camera tab clicked');
+  switchTab('camera');
+});
+
+document.getElementById('tabUpload')?.addEventListener('click', () => {
+  console.log('[Scanner] Upload tab clicked');
   switchTab('upload');
-} else {
-  // Auto-start camera if camera tab is active
-  if (document.getElementById('contentCamera').classList.contains('active')) {
-    startScanner();
+});
+
+// Initial setup
+function init() {
+  console.log('[Scanner] Initializing, initialTab:', initialTab);
+  if (initialTab === 'upload') {
+    switchTab('upload');
+  } else {
+    // Auto-start camera if camera tab is active
+    const cameraContent = document.getElementById('contentCamera');
+    if (cameraContent && cameraContent.classList.contains('active')) {
+      startScanner();
+    }
   }
 }
 
@@ -278,3 +334,10 @@ window.addEventListener('beforeunload', () => {
     stream.getTracks().forEach(t => t.stop());
   }
 });
+
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}

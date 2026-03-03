@@ -225,8 +225,9 @@ export async function createFolder(name, color = '#00E5FF') {
 /**
  * Delete a folder
  * @param {string} folderId
+ * @param {string} password - Vault password for re-encryption
  */
-export async function deleteFolder(folderId) {
+export async function deleteFolder(folderId, password) {
   const folders = await getFolders();
   const filtered = folders.filter(f => f.id !== folderId);
   await saveFolders(filtered);
@@ -239,14 +240,40 @@ export async function deleteFolder(folderId) {
     }
   });
   await setSessionItem('accounts', accounts);
+  
+  // Re-encrypt vault to persist folder changes
+  if (password) {
+    const { encrypt } = await import('./crypto.js');
+    const plaintext = JSON.stringify(accounts);
+    const encrypted = await encrypt(plaintext, password);
+    await setLocalItem('vault', encrypted);
+  }
+}
+
+/**
+ * Check if Uncategorized filter is hidden
+ * @returns {Promise<boolean>}
+ */
+export async function isUncategorizedHidden() {
+  const hidden = await getSyncItem('hideUncategorized');
+  return !!hidden;
+}
+
+/**
+ * Set Uncategorized filter visibility
+ * @param {boolean} hidden
+ */
+export async function setUncategorizedHidden(hidden) {
+  return setSyncItem('hideUncategorized', hidden);
 }
 
 /**
  * Move account to folder
  * @param {string} accountId
  * @param {string|null} folderId
+ * @param {string} password - Vault password for re-encryption
  */
-export async function moveAccountToFolder(accountId, folderId) {
+export async function moveAccountToFolder(accountId, folderId, password) {
   const accounts = await getSessionItem('accounts') || [];
   const account = accounts.find(a => a.id === accountId);
   if (account) {
@@ -256,5 +283,13 @@ export async function moveAccountToFolder(accountId, folderId) {
       delete account.folderId;
     }
     await setSessionItem('accounts', accounts);
+    
+    // Re-encrypt vault to persist folder assignment
+    if (password) {
+      const { encrypt } = await import('./crypto.js');
+      const plaintext = JSON.stringify(accounts);
+      const encrypted = await encrypt(plaintext, password);
+      await setLocalItem('vault', encrypted);
+    }
   }
 }

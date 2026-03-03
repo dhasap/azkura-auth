@@ -4,34 +4,55 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Azkura Auth</title>
+  <link rel="stylesheet" href="../popup/style.css" />
   <style>
-    /* Chromebook/Desktop popup size fix */
+    /* Mobile: Fullscreen layout */
     html, body {
-      width: 400px !important;
-      height: 600px !important;
-      min-width: 400px !important;
-      min-height: 600px !important;
-      max-width: 400px !important;
-      max-height: 600px !important;
+      width: 100% !important;
+      height: 100% !important;
+      min-width: 100% !important;
+      min-height: 100% !important;
+      max-width: 100% !important;
+      max-height: 100% !important;
       overflow: hidden !important;
       margin: 0 !important;
       padding: 0 !important;
     }
-    body {
-      position: relative;
-    }
     #app {
-      width: 400px !important;
-      height: 600px !important;
-      min-width: 400px !important;
-      min-height: 600px !important;
-      max-width: 400px !important;
-      max-height: 600px !important;
+      width: 100% !important;
+      height: 100% !important;
+      min-width: 100% !important;
+      min-height: 100% !important;
+      max-width: 100% !important;
+      max-height: 100% !important;
+    }
+    
+    /* Mobile view fix - ensure only one view visible */
+    .view {
+      display: none;
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--bg-base);
+    }
+    
+    .view.active {
+      display: flex;
+      animation: fadeIn 0.3s ease;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* Ensure onboarding/lock are on top */
+    #viewOnboarding.active,
+    #viewLock.active {
+      z-index: 100;
     }
   </style>
-  <script type="module" crossorigin src="/assets/modulepreload-polyfill-B5Qt9EMX.js"></script>
-  <script type="module" crossorigin src="/assets/main-Dykdc_Tt.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main-A9N6dqk8.css">
 </head>
 <body>
   <div id="app">
@@ -45,7 +66,7 @@
     <div class="view" id="viewOnboarding">
       <div class="lock-view">
         <div class="lock-logo">
-          <img class="lock-logo-icon" src="/assets/icon128-BTwHR2_d.png" alt="Azkura Auth" style="width:80px;height:80px;border-radius:16px;box-shadow:0 4px 20px rgba(0,229,255,0.2);" />
+          <img class="lock-logo-icon" src="../../icons/icon128.png" alt="Azkura Auth" style="width:80px;height:80px;border-radius:16px;box-shadow:0 4px 20px rgba(0,229,255,0.2);" />
           <div class="lock-app-name">Azkura Auth</div>
         </div>
 
@@ -120,7 +141,7 @@
     <div class="view" id="viewLock">
       <div class="lock-view">
         <div class="lock-logo">
-          <img class="lock-logo-icon" src="/assets/icon128-BTwHR2_d.png" alt="Azkura Auth" style="width:80px;height:80px;border-radius:16px;box-shadow:0 4px 20px rgba(0,229,255,0.2);" />
+          <img class="lock-logo-icon" src="../../icons/icon128.png" alt="Azkura Auth" style="width:80px;height:80px;border-radius:16px;box-shadow:0 4px 20px rgba(0,229,255,0.2);" />
           <div class="lock-app-name">Azkura Auth</div>
         </div>
         <div class="lock-subtitle">Enter your PIN to unlock</div>
@@ -149,7 +170,7 @@
       <!-- Header -->
       <header class="header">
         <div class="header-logo">
-          <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAIAAADYYG7QAAAACXBIWXMAAAsTAAALEwEAmpwYAAAICklEQVR4nNVYa1Ab1xWWO9N2OlO3/ddpf3jSaeumTZt6OnU8Q6e13Y7rNAXXbuMkpHbGcZrYtcHYHhOCsWM3gHkbsKkxmJcQCCOBBBghJCEe4imBxEsg3k8hhIQeKwlJq929t7O7QGwiBAKnJmf0496jvWe/e853zr1nGXBnCWDAHSYMuMOEAb8SgAAAG2peDCDwvHFsaPA5hAwASABAAAheOCAAAE4AuIoEQHzbLt06hwAlEEKHB5tYco27UDuOU6hIh61ZtXkObBEQoKY2lztVrv4zt+m14voDFa3v9I/lWW0IhtGwfANa3c+mAPkWQBkyIPbjOdXfDsnYcyY+6EbusVsFPz6f8lIG78KkdhH1rGLyVxhbozCE8CJT+LXjnx67kjE2o6f/GpvWHwtN+0F04a3xWRoQ+PLSHqwMCJLFUD09/703b/36VIzRjJBKAGi9GXHs/1fiPpZ4xOGEEFKU925nPT5t4CHwBUMYTkAIC4QdjN+ev5NXDSF0oxiV9sDtIdmT8rj+u+GZ5dPzTwP6EkOGUYAS8msYL73LFLSvaqjXk4OSxu5d59OyeseeJyAfWYpRuf2QXfdy4McNSo3WiS46nGqrXY04TC63jsDbJ3S/u8MuaFNDCD0rWL0mlx8hW49DgBpbnK6cJtX7zNpXk0pPFImj5eq/ieXvdA3Ejk4FSzp/L+y4PDDGsVitT63fLiCvQlD+b9ZM7r36392n4/dFZF9iivLb+97gNPYbTWqLNVilKewevpgvfC2pZE8q56hysMvtIhdu/h1+AcIpihQ2qna9HlEiUuA4SeFwoTyhUZWk1CR0DmaPz0YNktQhcJxd0fLDxJJKJ5Vr/hwnzwBajsuzXgUrSpq87Abl7qDr6ok5CKFGZzyQVNI+NXcor+ZwsUSuN56QKFK7h6ecztEZ/d575QIzGTd8HYNe4+iPh3ASUJFY/q03IlSjZOm7zKq9xha3jM/ESBSJ8n7ppDZFOXyyve9q92DL6MzPHlTydYZteWgzgFjC9m8eDR+a1duWnL+4mKye0Vcp1cn1irtdA3Wz8/xx7RFhW5x6TDmr35vBL5/Qbh2QV/6DpwZ0whdUyr7xxys6CxKZyT+bUKw3meJLa5NrWop7hgpVmpP5wreKJLmdGh1i/0laOXdgYjVkvvmw9ZAVVzV//VBYfe/Iv2MLyuo7U0pqE4priqQdITlVf0oo/k+VrH1s9kg6VzY1/9O0cn6f3+XR7yyTtPV9PzCC26j4y/mEwx/F//XKvQ9i8+OYVcn8hqrO/n+mlTKbui+xasM40j9kPakfmqZPuu0C8hoyghpPahfCk1iHz8RGppacicrsH5nm1sjC4vNic3lFotby1t7DkVmygfGgRPYNrnTCYPaRUNsqjIBaTNfGKok84OTNh5y637wZBQA0WW2V9QqepMNoIpP80NX7cSWSg5HZlR39/rrH78MVUNYR+9LPgyIYP3q7QtpJHlgYSfbVU1aumQy4lPZ+8uMlN7qFvmXdkK3hP1gZ0NSWtPbteuW9/cG3h6lrBkEK+e+UGQnOEbwVy9QZTbTeh3E/AK1xiVd2C2Tdu/ed/U5AyL2KZhfqcWNYQWvfnpB7u49d5zZ2049toQfZYhuEU5hGp3RHzyUxXj71qw9T9l/NZBwMOxKappkkTxXaYVuQdQERBH0rBThO0D9qw+SUDo8Hw8iOhyAq6hQBp2MOnPqsXCwnqOJJPUI9vRIdglg2suq29RD7SnsAvHc/n08/R0++cLk6PAvFm3EazaYB0YaGJ7W9QxM4QfDr5BV18hbV0Mik1mhGWpQDqsFxpxsdGJkemdKVCFqk7X0QwnmjpUGuXiVyj2ZCb7TY7Euz8wYcJ9QjU6IWVaVUoegbWTBZAQAjk9rNAqKd+eHNBydCElDUXSPreiUoLDGXdzYq44OoDEFT17vXUnUG8ycprLA7uRc+y37v4zRpW8+jsrp9fw+nmxAMwy7FZJfWyHo046WCpkULcreAL2xWXb/Lau5UJ+aUD47P3rjLWsk4n4Do/bWpNAdP3wwIvi5q6S7gST9NZztdzlePX/tl4OWpuYW3LycrB8ZCo3Oi0otfP3cn8FyMoLEr8KPoQ6dv3M4ohRCWidquxOVeS8rnCFtKBbJp3cL9oifzRguTL52ZN164/ZDJl4YnFSwD8u0hOn2yOWJWZZOwuTsypegfoYmh0Tk5HPGDouomhToui1vd0HUiJD6HK6mul2dzxMyKhpS8ikx2bWff6CcphQSBs580DU9qpe29T+oVeby6W/fZQxPaBZNVKFPOLSzWNCoghEyelObTpji0WtDsDieGeYxm69zCIop6HEtOxG5HPR690ex0umyOJY/HY7YiixYEwzwuN4pjuAWx2+wON4paEJvZanM4nYZFM4qiiH2JnLnc1DeTdUuUr0rtRtFHHAFPJBM3K3ii5vxyUR639lGpIOuxoFHek8cRNHSoWHwJX9TMEzWXCZvSmfzq+nZJq5JdVVdcQeqZfHEOR5jLqWFViDg1jcyy2vQCntXu8HHG+Up7D4YZTJaZuQWLze50ui02+7zBpDeaTFabC0VNFmRObzQskl6wIPa5BeOixWpB7CarTas3mhGbzeHU6g1mq41etbBoNpgsRrPVQzW4X6wpXgD5uBgAX3Vl3XrjTbvBwo3PMkAuWy11ywp6f15k5eZEC80UuvP3XS03C+j/LxuEDDx1/Vij8dEXbObD2Xre2tke2gnCgDtMGC8awFr5H1oZPEwDlCrfAAAAAElFTkSuQmCC" alt="Azkura" style="width:32px;height:32px;border-radius:8px;" />
+          <img src="../../icons/icon48.png" alt="Azkura" style="width:32px;height:32px;border-radius:8px;" />
         </div>
         <div class="header-title">Azkura</div>
         <div class="header-actions">
@@ -994,5 +1015,6 @@
 
   </div><!-- end #app -->
 
+  <script type="module" src="../popup/main.js"></script>
 </body>
 </html>

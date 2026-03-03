@@ -31,7 +31,7 @@
     "camera"
   ],
   "oauth2": {
-    "client_id": "861059574565-2lnjskhsb0s00c1g6fepv7s5kd6veqcs.apps.googleusercontent.com",
+    "client_id": "861059574565-gvp72f1nri3l2fhpnls1eu7dtot87dl4.apps.googleusercontent.com",
     "scopes": [
       "openid",
       "email",
@@ -45,7 +45,9 @@
         "<all_urls>"
       ],
       "resources": [
+        "src/app/index.html",
         "src/scanner/scanner.html",
+        "src/auth/callback.html",
         "icons/*.png"
       ],
       "use_dynamic_url": false

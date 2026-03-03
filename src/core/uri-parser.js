@@ -26,7 +26,24 @@ export function parseOtpauthURI(uri) {
     throw new Error('Invalid URI: malformed URL');
   }
 
-  const type = url.hostname.toLowerCase(); // 'totp' or 'hotp'
+  let type = url.hostname.toLowerCase(); // 'totp' or 'hotp'
+  
+  // Handle empty hostname (e.g., otpauth:///label) - default to totp
+  if (!type) {
+    // Try to get type from path if hostname is empty
+    const pathParts = url.pathname.split('/').filter(p => p);
+    if (pathParts.length > 0) {
+      const possibleType = pathParts[0].toLowerCase();
+      if (possibleType === 'totp' || possibleType === 'hotp') {
+        type = possibleType;
+      }
+    }
+    // Still empty, default to totp
+    if (!type) {
+      type = 'totp';
+    }
+  }
+  
   if (type !== 'totp' && type !== 'hotp') {
     throw new Error(`Unsupported OTP type: ${type}`);
   }

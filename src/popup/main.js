@@ -3,6 +3,67 @@
  * Features: TOTP generation, PIN optional, Google login, Drive backup
  */
 
+// ─── Mobile Detection & Redirect ─────────────────────────────────────────────
+// If mobile device detected, open app in new tab instead of popup
+// IMPORTANT: Only check userAgent, NOT screen size! Desktop popup is 400px wide.
+(function checkMobile() {
+  // Check if already running in tab mode (not popup)
+  // Popup window is small (~400px), tab is full browser window
+  const isLikelyPopup = window.innerWidth <= 500 && window.outerWidth <= 600;
+  const isLikelyTab = window.innerWidth > 500 || window.outerHeight > 800;
+  
+  // Skip if already in tab mode
+  if (isLikelyTab && !isLikelyPopup) {
+    return;
+  }
+  
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
+  if (isMobile) {
+    const appUrl = chrome.runtime.getURL('src/app/index.html');
+    
+    // Check if we're already on the app page
+    if (window.location.href.includes('/app/')) {
+      return; // Already in tab mode
+    }
+    
+    // Open app in new tab
+    chrome.tabs.query({ url: appUrl }, (tabs) => {
+      if (tabs.length > 0) {
+        // Tab already exists, just focus it
+        chrome.tabs.update(tabs[0].id, { active: true }, (tab) => {
+          if (chrome.runtime.lastError) {
+            console.log('Tab focus error:', chrome.runtime.lastError);
+            // Try creating new tab
+            chrome.tabs.create({ url: appUrl });
+            return;
+          }
+          chrome.windows.update(tabs[0].windowId, { focused: true });
+        });
+      } else {
+        // Create new tab
+        chrome.tabs.create({ url: appUrl }, (tab) => {
+          if (chrome.runtime.lastError) {
+            console.error('Tab create error:', chrome.runtime.lastError);
+          }
+        });
+      }
+    });
+    
+    // Close popup after a short delay to allow tab to open
+    setTimeout(() => {
+      try {
+        window.close();
+      } catch (e) {
+        console.log('Could not close window:', e);
+      }
+    }, 300);
+    
+    // Prevent further execution
+    return;
+  }
+})();
+
 import { generateTOTP, getRemainingSeconds, formatCode, isValidSecret } from '../core/totp.js';
 import { setupPin, verifyPin, encrypt, getDefaultKey } from '../core/crypto.js';
 import { parseOtpauthURI } from '../core/uri-parser.js';
@@ -42,7 +103,17 @@ import {
   createFolder,
   deleteFolder,
   moveAccountToFolder,
+  isUncategorizedHidden,
+  setUncategorizedHidden,
 } from '../core/storage.js';
+import {
+  trackAccountCopy,
+  trackBackup,
+  trackFirstAccount,
+  getDashboardStats,
+  getTimeAgo,
+  getSecurityStatus
+} from '../core/stats.js';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 let currentPassword = null; // in-memory PIN for re-encryption (null if using default key)
@@ -489,7 +560,15 @@ async function copyCode(accountId, codeEl, flashEl, cardEl) {
     setTimeout(() => cardEl.classList.remove('copied'), 800);
     showToast('Code copied!', 'success', 1500);
     resetAutoLock();
-    if (prefs.closeAfterCopy) {
+    
+    // Track this copy event for statistics
+    await trackAccountCopy(accountId);
+    
+    // Only close window if running in popup mode (not in tab mode)
+    // Popup mode: window is small (around 400px wide)
+    // Tab mode: window is full browser window
+    const isPopupMode = window.innerWidth <= 500 && window.outerWidth <= 500;
+    if (prefs.closeAfterCopy && isPopupMode) {
       setTimeout(() => window.close(), 700);
     }
   } catch {
@@ -757,6 +836,10 @@ function initAddAccountModal() {
       $('#btnAddAccountSubmit').disabled = true;
       const newAccount = await addAccount({ issuer, account, secret, algorithm, digits, period }, currentPassword);
       currentAccounts = await getAccounts();
+      
+      // Track first account creation
+      await trackFirstAccount();
+      
       renderAccounts(currentAccounts);
       closeModal('#modalAddAccount');
       clearAddForm();
@@ -868,10 +951,11 @@ function initProfileMenu() {
   const btnProfile = $('#btnProfile');
   const overlay = $('#profileMenuOverlay');
 
-  btnProfile.addEventListener('click', () => {
+  btnProfile.addEventListener('click', async () => {
     const isOpen = overlay.classList.toggle('open');
     if (isOpen) {
-      refreshProfileUI();
+      await refreshProfileUI();
+      await refreshProfileStats();
     }
   });
 
@@ -884,13 +968,21 @@ function initProfileMenu() {
 
   // Login
   $('#btnLoginGoogle').addEventListener('click', async () => {
-    const result = await loginGoogle();
-    if (result.success) {
-      showToast(`Welcome, ${result.user.name}!`, 'success');
-      await refreshProfileUI();
-      overlay.classList.remove('open');
-    } else {
-      showToast('Login failed: ' + result.error, 'error');
+    showToast('Connecting to Google...', 'info');
+    try {
+      console.log('[Google Login] Starting...');
+      const result = await loginGoogle();
+      console.log('[Google Login] Result:', result);
+      if (result.success) {
+        showToast(`Welcome, ${result.user.name}!`, 'success');
+        await refreshProfileUI();
+        overlay.classList.remove('open');
+      } else {
+        showToast('Login failed: ' + result.error, 'error', 5000);
+      }
+    } catch (err) {
+      console.error('[Google Login] Error:', err);
+      showToast('Login error: ' + err.message, 'error', 5000);
     }
   });
 
@@ -988,6 +1080,262 @@ async function refreshProfileUI() {
   }
 }
 
+/**
+ * Refresh profile statistics dashboard
+ */
+async function refreshProfileStats() {
+  const statsContainer = $('#profileStatsDashboard');
+  if (!statsContainer) return;
+  
+  const hasPin = await isPinSetup();
+  const pinEnabled = await isPinEnabled();
+  const hasGoogleBackup = await isLoggedIn();
+  
+  const stats = await getDashboardStats(currentAccounts, folders, {
+    hasPin,
+    pinEnabled,
+    hasGoogleBackup,
+    accountCount: currentAccounts.length,
+    hasFolders: folders.length > 0
+  });
+  
+  // Update Quick Stats Cards
+  animateCounter('#statTotalAccounts', stats.totalAccounts);
+  animateCounter('#statSecurityScore', stats.securityScore, '%');
+  $('#statLastBackup').textContent = stats.lastBackupAgo;
+  animateCounter('#statTotalFolders', stats.totalFolders);
+  
+  // Update Security Status Badge
+  const statusEl = $('#securityStatusBadge');
+  if (statusEl) {
+    statusEl.textContent = `${stats.securityStatus.icon} ${stats.securityStatus.text}`;
+    statusEl.style.color = stats.securityStatus.color;
+  }
+  
+  // Update Security Score Progress
+  const scoreProgress = $('#securityScoreProgress');
+  if (scoreProgress) {
+    scoreProgress.style.width = `${stats.securityScore}%`;
+    scoreProgress.style.backgroundColor = stats.securityStatus.color;
+  }
+  
+  // Update Service Distribution
+  renderServiceDistribution(stats.serviceDistribution, stats.totalAccounts);
+  
+  // Update Most Used Accounts
+  renderMostUsedAccounts(stats.mostUsed);
+  
+  // Update Weekly Activity
+  renderWeeklyActivity(stats.weeklyActivity);
+  
+  // Update Folder Distribution
+  renderFolderDistribution(stats.folderDistribution);
+}
+
+/**
+ * Animate counter from 0 to target value
+ * @param {string} selector
+ * @param {number} target
+ * @param {string} suffix
+ */
+function animateCounter(selector, target, suffix = '') {
+  const el = $(selector);
+  if (!el) return;
+  
+  const duration = 800;
+  const start = performance.now();
+  const startValue = 0;
+  
+  function update(currentTime) {
+    const elapsed = currentTime - start;
+    const progress = Math.min(elapsed / duration, 1);
+    
+    // Easing function (ease-out)
+    const easeOut = 1 - Math.pow(1 - progress, 3);
+    const current = Math.floor(startValue + (target - startValue) * easeOut);
+    
+    el.textContent = current + suffix;
+    
+    if (progress < 1) {
+      requestAnimationFrame(update);
+    } else {
+      el.textContent = target + suffix;
+    }
+  }
+  
+  requestAnimationFrame(update);
+}
+
+/**
+ * Render service distribution donut chart
+ * @param {Array} distribution
+ * @param {number} total
+ */
+function renderServiceDistribution(distribution, total) {
+  const container = $('#serviceDistributionChart');
+  const list = $('#serviceDistributionList');
+  if (!container || !list) return;
+  
+  // Clear previous
+  list.innerHTML = '';
+  
+  if (distribution.length === 0) {
+    container.style.display = 'none';
+    list.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:12px;">No accounts yet</div>';
+    return;
+  }
+  
+  container.style.display = 'block';
+  
+  // Generate colors
+  const colors = ['#00E5FF', '#30D158', '#FFD60A', '#FF9500', '#FF3B3B', '#7B3FE4', '#6C6C6C'];
+  
+  // Create SVG donut chart
+  let svgSegments = '';
+  let currentAngle = 0;
+  const radius = 40;
+  const cx = 50;
+  const cy = 50;
+  
+  distribution.forEach((item, index) => {
+    const percentage = item.count / total;
+    const angle = percentage * 360;
+    const color = colors[index % colors.length];
+    
+    // Calculate path
+    const startAngle = (currentAngle - 90) * Math.PI / 180;
+    const endAngle = (currentAngle + angle - 90) * Math.PI / 180;
+    
+    const x1 = cx + radius * Math.cos(startAngle);
+    const y1 = cy + radius * Math.sin(startAngle);
+    const x2 = cx + radius * Math.cos(endAngle);
+    const y2 = cy + radius * Math.sin(endAngle);
+    
+    const largeArc = angle > 180 ? 1 : 0;
+    
+    const path = `M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+    svgSegments += `<path d="${path}" fill="${color}" />`;
+    
+    currentAngle += angle;
+    
+    // Add to list
+    const percent = Math.round(percentage * 100);
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:12px;';
+    row.innerHTML = `
+      <span style="width:8px;height:8px;border-radius:50%;background:${color};"></span>
+      <span style="flex:1;color:var(--text-primary);">${escHtml(item.name)}</span>
+      <span style="color:var(--text-secondary);">${item.count} (${percent}%)</span>
+    `;
+    list.appendChild(row);
+  });
+  
+  // Inner circle (cutout)
+  const innerCircle = `<circle cx="${cx}" cy="${cy}" r="25" fill="var(--bg-card)" />`;
+  
+  container.innerHTML = `
+    <svg viewBox="0 0 100 100" style="width:80px;height:80px;">
+      ${svgSegments}
+      ${innerCircle}
+    </svg>
+  `;
+}
+
+/**
+ * Render most used accounts
+ * @param {Array} mostUsed
+ */
+function renderMostUsedAccounts(mostUsed) {
+  const container = $('#mostUsedAccounts');
+  if (!container) return;
+  
+  container.innerHTML = '';
+  
+  if (mostUsed.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:12px;font-size:12px;">Start copying codes to see usage stats</div>';
+    return;
+  }
+  
+  const maxCount = mostUsed[0].copyCount;
+  
+  mostUsed.forEach((acc, index) => {
+    const percentage = (acc.count / maxCount) * 100;
+    const stars = '⭐'.repeat(Math.min(3, Math.ceil(acc.count / Math.max(1, maxCount / 3))));
+    
+    const item = document.createElement('div');
+    item.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-subtle);';
+    item.innerHTML = `
+      <span style="font-weight:600;color:var(--accent);min-width:20px;">${index + 1}</span>
+      <div style="flex:1;">
+        <div style="font-size:12px;font-weight:500;color:var(--text-primary);">${escHtml(acc.issuer || acc.account || 'Unknown')}</div>
+        <div style="height:4px;background:var(--border-subtle);border-radius:2px;margin-top:4px;overflow:hidden;">
+          <div style="height:100%;width:${percentage}%;background:var(--accent);border-radius:2px;transition:width 0.5s ease;"></div>
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:11px;color:var(--text-secondary);">${acc.count}x</div>
+        <div style="font-size:10px;">${stars}</div>
+      </div>
+    `;
+    container.appendChild(item);
+  });
+}
+
+/**
+ * Render weekly activity mini bar chart
+ * @param {Array} weeklyActivity
+ */
+function renderWeeklyActivity(weeklyActivity) {
+  const container = $('#weeklyActivityChart');
+  if (!container) return;
+  
+  const maxCount = Math.max(1, ...weeklyActivity.map(d => d.count));
+  
+  container.innerHTML = weeklyActivity.map(day => {
+    const height = (day.count / maxCount) * 100;
+    const isToday = day.date === new Date().toISOString().slice(0, 10);
+    return `
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <div style="width:100%;height:40px;background:var(--border-subtle);border-radius:4px;position:relative;overflow:hidden;">
+          <div style="position:absolute;bottom:0;left:0;right:0;height:${height}%;background:${isToday ? 'var(--accent)' : 'var(--text-muted)'};border-radius:4px;transition:height 0.5s ease;"></div>
+        </div>
+        <span style="font-size:10px;color:${isToday ? 'var(--accent)' : 'var(--text-secondary)'};font-weight:${isToday ? '600' : '400'};">${day.day}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+/**
+ * Render folder distribution
+ * @param {Array} folderDistribution
+ */
+function renderFolderDistribution(folderDistribution) {
+  const container = $('#folderDistribution');
+  if (!container) return;
+  
+  container.innerHTML = '';
+  
+  if (folderDistribution.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:12px;font-size:12px;">No folders yet</div>';
+    return;
+  }
+  
+  const total = folderDistribution.reduce((sum, f) => sum + f.count, 0);
+  
+  folderDistribution.forEach(folder => {
+    const percentage = (folder.count / total) * 100;
+    
+    const item = document.createElement('div');
+    item.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 0;';
+    item.innerHTML = `
+      <span style="width:12px;height:12px;border-radius:50%;background:${folder.color};"></span>
+      <span style="flex:1;font-size:12px;color:var(--text-primary);">${escHtml(folder.name)}</span>
+      <span style="font-size:11px;color:var(--text-secondary);">${folder.count} (${Math.round(percentage)}%)</span>
+    `;
+    container.appendChild(item);
+  });
+}
+
 async function backupToDrive() {
   if (!(await isLoggedIn())) {
     showToast('Please sign in with Google first', 'error');
@@ -998,9 +1346,20 @@ async function backupToDrive() {
 
   const result = await uploadBackupToDrive(currentAccounts);
   if (result.success) {
+    // Track backup event
+    await trackBackup();
+    // Refresh stats if profile menu is open
+    await refreshProfileStats();
     showToast(`Backup saved: ${result.fileName}`, 'success', 3000);
   } else {
-    showToast('Backup failed: ' + result.error, 'error');
+    // Check if session expired
+    if (result.error?.includes('Session expired') || result.error?.includes('sign in again')) {
+      showToast('Session expired. Please sign in again.', 'error', 4000);
+      // Refresh profile UI to show logged out state
+      await refreshProfileUI();
+    } else {
+      showToast('Backup failed: ' + result.error, 'error');
+    }
   }
 }
 
@@ -1027,8 +1386,16 @@ async function restoreFromDrive() {
   $('#restoreDriveLoading').style.display = 'none';
 
   if (!result.success) {
-    $('#restoreDriveError').textContent = 'Failed to load backups: ' + result.error;
-    $('#restoreDriveError').style.display = 'block';
+    // Check if session expired
+    if (result.error?.includes('Session expired') || result.error?.includes('sign in again')) {
+      $('#restoreDriveError').textContent = 'Session expired. Please sign in again.';
+      $('#restoreDriveError').style.display = 'block';
+      // Refresh profile UI to show logged out state
+      await refreshProfileUI();
+    } else {
+      $('#restoreDriveError').textContent = 'Failed to load backups: ' + result.error;
+      $('#restoreDriveError').style.display = 'block';
+    }
     return;
   }
 
@@ -1098,7 +1465,14 @@ async function downloadAndRestore(fileId, fileName) {
   const result = await downloadBackupFromDrive(fileId);
   
   if (!result.success) {
-    showToast('Download failed: ' + result.error, 'error');
+    // Check if session expired
+    if (result.error?.includes('Session expired') || result.error?.includes('sign in again')) {
+      showToast('Session expired. Please sign in again.', 'error', 4000);
+      closeModal('#modalRestoreDrive');
+      await refreshProfileUI();
+    } else {
+      showToast('Download failed: ' + result.error, 'error');
+    }
     return;
   }
 
@@ -1109,13 +1483,24 @@ async function downloadAndRestore(fileId, fileName) {
     // Get vault password (PIN or default)
     const vaultPw = currentPassword || await getDefaultKey();
     
-    // Restore directly without password (Drive backup is not encrypted with user password)
-    const restoreResult = await restoreFromDriveBackup(result.data.accounts, vaultPw);
+    // Restore with folders if present (Drive backup is not encrypted with user password)
+    const foldersData = result.data.folders || null;
+    const restoreResult = await restoreFromDriveBackup(result.data.accounts, vaultPw, foldersData);
     
     currentAccounts = await getAccounts();
+    
+    // Reload folders after restore
+    await loadFolders();
+    await renderFolderChips();
+    
     renderAccounts(currentAccounts);
     closeModal('#modalSettings');
-    showToast(`Restored ${restoreResult.imported} account(s) from Drive!`, 'success');
+    
+    let msg = `Restored ${restoreResult.imported} account(s) from Drive`;
+    if (restoreResult.foldersImported > 0) {
+      msg += ` and ${restoreResult.foldersImported} folder(s)`;
+    }
+    showToast(msg + '!', 'success');
   } catch (err) {
     showToast('Restore failed: ' + err.message, 'error');
   }
@@ -1143,7 +1528,14 @@ async function deleteBackup(fileId, fileName, element) {
       $('#restoreDriveEmpty').style.display = 'block';
     }
   } else {
-    showToast('Delete failed: ' + result.error, 'error');
+    // Check if session expired
+    if (result.error?.includes('Session expired') || result.error?.includes('sign in again')) {
+      showToast('Session expired. Please sign in again.', 'error', 4000);
+      closeModal('#modalRestoreDrive');
+      await refreshProfileUI();
+    } else {
+      showToast('Delete failed: ' + result.error, 'error');
+    }
   }
 }
 
@@ -1303,69 +1695,41 @@ function initSettings() {
     }
   });
 
-  // Import
+  // Import/Restore - For popup mode: open app tab with import flag
+  // For tab mode: process directly
   $('#importFileInput').addEventListener('change', async (e) => {
     pendingImportFile = e.target.files[0];
     if (!pendingImportFile) return;
     
-    try {
-      const text = await pendingImportFile.text();
-      const backup = JSON.parse(text);
-      
-      // Check if it's a plain backup (no encryption) or encrypted backup
-      if (backup.accounts && !backup.encrypted) {
-        // Plain backup - import directly without password
-        const result = await importPlainBackup(text, currentPassword);
-        currentAccounts = await getAccounts();
-        renderAccounts(currentAccounts);
-        closeModal('#modalSettings');
-        showToast(`Imported ${result.imported} account(s)!`, 'success');
-        pendingImportFile = null;
-      } else if (backup.encrypted) {
-        // Encrypted backup - show password modal
-        $('#importPassword').value = '';
-        $('#importPasswordError').classList.remove('visible');
-        $('#importFileInfo').textContent = `File: ${pendingImportFile.name}. This backup is encrypted. Enter the password.`;
-        openModal('#modalImportPassword');
-      } else {
-        showToast('Invalid backup file format', 'error');
-      }
-    } catch (err) {
-      showToast('Failed to read file: ' + err.message, 'error');
-    }
+    // Check if we're in the app page (tab mode) by checking URL
+    const isAppPage = window.location.pathname.includes('/app/');
     
-    e.target.value = ''; // reset so same file can be re-selected
-  });
-
-  $('#closeModalImport').addEventListener('click', () => closeModal('#modalImportPassword'));
-
-  $('#btnImportConfirm').addEventListener('click', async () => {
-    if (!pendingImportFile) return;
-    const pw = $('#importPassword').value;
-    const errEl = $('#importPasswordError');
-
-    if (!pw) {
-      errEl.textContent = 'Please enter the backup password';
-      errEl.classList.add('visible');
+    if (isAppPage) {
+      // Already in tab mode - process directly
+      await processImportFile(pendingImportFile);
+      e.target.value = '';
       return;
     }
-
-    try {
-      $('#btnImportConfirm').disabled = true;
-      const text = await pendingImportFile.text();
-      const result = await importBackup(text, pw, currentPassword);
-      currentAccounts = await getAccounts();
-      renderAccounts(currentAccounts);
-      closeModal('#modalImportPassword');
-      closeModal('#modalSettings');
-      showToast(`Imported ${result.imported} account(s)!`, 'success');
-      pendingImportFile = null;
-    } catch (err) {
-      errEl.textContent = err.message;
-      errEl.classList.add('visible');
-    } finally {
-      $('#btnImportConfirm').disabled = false;
+    
+    // This shouldn't happen in popup anymore since we redirect first
+    // But keep as fallback
+    console.warn('[Import] File selected in popup mode - unexpected');
+    e.target.value = '';
+  });
+  
+  // Handle import trigger - redirect to app tab first if in popup
+  $('#importFileInput').addEventListener('click', (e) => {
+    const isAppPage = window.location.pathname.includes('/app/');
+    
+    if (!isAppPage) {
+      // In popup - prevent default file picker and open app tab instead
+      e.preventDefault();
+      const appUrl = chrome.runtime.getURL('src/app/index.html?selectImport=1');
+      chrome.tabs.create({ url: appUrl });
+      // Close popup
+      setTimeout(() => window.close(), 50);
     }
+    // In tab mode - allow default behavior (open file picker)
   });
 
   // Delete all
@@ -1398,6 +1762,46 @@ function initSettings() {
       showToast('Failed to delete: ' + err.message, 'error');
     }
   });
+}
+
+// Process import file (used by both popup and tab mode)
+async function processImportFile(file) {
+  try {
+    const text = await file.text();
+    const backup = JSON.parse(text);
+    
+    // Check if it's a valid backup
+    if (backup.accounts && Array.isArray(backup.accounts)) {
+      // Plain backup - import directly without password
+      const result = await importPlainBackup(text, currentPassword);
+      currentAccounts = await getAccounts();
+      
+      // Reload folders after import
+      await loadFolders();
+      await renderFolderChips();
+      
+      renderAccounts(currentAccounts);
+      closeModal('#modalSettings');
+      
+      let msg = `Restored ${result.imported} account(s)`;
+      if (result.foldersImported > 0) {
+        msg += ` and ${result.foldersImported} folder(s)`;
+      }
+      showToast(msg + '!', 'success');
+      
+      return true;
+    } else if (backup.encrypted) {
+      // Encrypted backup (old format) - show error
+      showToast('This backup is encrypted. Please use a plain backup file.', 'error');
+      return false;
+    } else {
+      showToast('Invalid backup file format', 'error');
+      return false;
+    }
+  } catch (err) {
+    showToast('Failed to read file: ' + err.message, 'error');
+    return false;
+  }
 }
 
 // Show PIN setup when enabling PIN protection
@@ -1526,6 +1930,27 @@ async function renderFolderChips() {
   
   container.innerHTML = '';
   
+  // Check if Uncategorized should be hidden
+  const uncategorizedHidden = await isUncategorizedHidden();
+  
+  // Add Uncategorized chip if not hidden
+  if (!uncategorizedHidden) {
+    const uncategorizedChip = document.createElement('button');
+    uncategorizedChip.className = 'folder-chip';
+    uncategorizedChip.dataset.folder = 'uncategorized';
+    uncategorizedChip.innerHTML = `
+      <span style="width:8px;height:8px;border-radius:50%;background:var(--border-medium);"></span>
+      Uncategorized
+    `;
+    uncategorizedChip.addEventListener('click', () => {
+      $$('.folder-chip[data-folder]').forEach(c => c.classList.remove('active'));
+      uncategorizedChip.classList.add('active');
+      currentFolderFilter = 'uncategorized';
+      renderAccounts(currentAccounts);
+    });
+    container.appendChild(uncategorizedChip);
+  }
+  
   for (const folder of folders) {
     const chip = document.createElement('button');
     chip.className = 'folder-chip';
@@ -1552,11 +1977,51 @@ async function openManageFoldersModal() {
 async function renderFoldersList() {
   const container = $('#foldersList');
   const currentFolders = await getFolders();
+  const uncategorizedHidden = await isUncategorizedHidden();
   
   container.innerHTML = '';
   
+  // Add Uncategorized folder item (virtual folder)
+  const uncategorizedItem = document.createElement('div');
+  uncategorizedItem.className = 'folder-item';
+  uncategorizedItem.innerHTML = `
+    <div class="folder-dot" style="background:var(--border-medium);"></div>
+    <div class="folder-name">Uncategorized</div>
+    <div class="folder-actions">
+      <button class="folder-btn delete" title="${uncategorizedHidden ? 'Show Uncategorized filter' : 'Hide Uncategorized filter'}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+          ${uncategorizedHidden 
+            ? '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>' // Eye icon (show)
+            : '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>' // Eye-off icon (hide)
+          }
+        </svg>
+      </button>
+    </div>
+  `;
+  
+  uncategorizedItem.querySelector('.folder-btn.delete').addEventListener('click', async () => {
+    const newHidden = !uncategorizedHidden;
+    await setUncategorizedHidden(newHidden);
+    await renderFoldersList();
+    await renderFolderChips();
+    showToast(newHidden ? 'Uncategorized filter hidden' : 'Uncategorized filter shown', 'info');
+  });
+  
+  container.appendChild(uncategorizedItem);
+  
+  // Divider
+  if (currentFolders.length > 0) {
+    const divider = document.createElement('div');
+    divider.className = 'divider';
+    divider.style.margin = '8px 0';
+    container.appendChild(divider);
+  }
+  
   if (currentFolders.length === 0) {
-    container.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:20px;">No folders yet</div>';
+    const emptyMsg = document.createElement('div');
+    emptyMsg.style.cssText = 'text-align:center;color:var(--text-secondary);padding:12px;font-size:12px;';
+    emptyMsg.textContent = 'No custom folders yet';
+    container.appendChild(emptyMsg);
     return;
   }
   
@@ -1578,7 +2043,7 @@ async function renderFoldersList() {
     
     item.querySelector('.folder-btn.delete').addEventListener('click', async () => {
       if (confirm(`Delete folder "${folder.name}"? Accounts will be uncategorized.`)) {
-        await deleteFolder(folder.id);
+        await deleteFolder(folder.id, currentPassword);
         await renderFoldersList();
         await renderFolderChips();
         renderAccounts(currentAccounts);
@@ -1601,7 +2066,7 @@ async function openMoveToFolderModal(accountId) {
   const uncategorized = document.createElement('div');
   uncategorized.className = `move-folder-item ${!account?.folderId ? 'selected' : ''}`;
   uncategorized.innerHTML = `
-    <div style="width:24px;height:24px;border-radius:50%;background:var(--border-medium);display:flex;align-items:center;justify-content:center;">
+    <div style="width:24px;height:8px;border-radius:50%;background:var(--border-medium);display:flex;align-items:center;justify-content:center;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
         <path d="M3 7v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2h-6l-2-2H5a2 2 0 0 0-2 2z"/>
       </svg>
@@ -1609,7 +2074,7 @@ async function openMoveToFolderModal(accountId) {
     <div style="flex:1;">Uncategorized</div>
   `;
   uncategorized.addEventListener('click', async () => {
-    await moveAccountToFolder(accountId, null);
+    await moveAccountToFolder(accountId, null, currentPassword);
     currentAccounts = await getAccounts();
     renderAccounts(currentAccounts);
     closeModal('#modalMoveToFolder');
@@ -1626,7 +2091,7 @@ async function openMoveToFolderModal(accountId) {
       <div style="flex:1;">${escHtml(folder.name)}</div>
     `;
     item.addEventListener('click', async () => {
-      await moveAccountToFolder(accountId, folder.id);
+      await moveAccountToFolder(accountId, folder.id, currentPassword);
       currentAccounts = await getAccounts();
       renderAccounts(currentAccounts);
       closeModal('#modalMoveToFolder');
@@ -1639,64 +2104,199 @@ async function openMoveToFolderModal(accountId) {
 }
 
 // ─── Initialization ───────────────────────────────────────────────────────────
+function initAppElements() {
+  // Initialize app-specific elements (fullscreen mode)
+  const sidebarAddBtn = document.getElementById('btnAddAccountSidebar');
+  if (sidebarAddBtn) {
+    sidebarAddBtn.addEventListener('click', () => {
+      clearAddForm();
+      openModal('#modalAddAccount');
+    });
+  }
+
+  const navSettings = document.getElementById('navSettings');
+  const navAccounts = document.getElementById('navAccounts');
+  
+  if (navSettings) {
+    navSettings.addEventListener('click', () => {
+      navSettings.classList.add('active');
+      if (navAccounts) navAccounts.classList.remove('active');
+      openModal('#modalSettings');
+    });
+  }
+
+  if (navAccounts) {
+    navAccounts.addEventListener('click', () => {
+      navAccounts.classList.add('active');
+      if (navSettings) navSettings.classList.remove('active');
+    });
+  }
+}
+
 async function init() {
-  // Initialize all components
-  initOnboarding();
-  initLockScreen();
-  initSearch();
-  initFAB();
-  initAddAccountModal();
-  initEditAccountModal();
-  initDeleteModal();
-  initSettings();
-  initProfileMenu();
-  initFolders();
+  try {
+    // Initialize all components
+    initOnboarding();
+    initLockScreen();
+    initSearch();
+    initFAB();
+    initAddAccountModal();
+    initEditAccountModal();
+    initDeleteModal();
+    initSettings();
+    initProfileMenu();
+    initFolders();
+    initAppElements(); // Initialize app-specific elements if present
 
-  // Determine initial view
-  const firstTime = await isFirstTimeSetup();
-  const pinSetup = await isPinSetup();
-  const pinEnabled = await isPinEnabled();
-  const unlocked = await isUnlocked();
+    // Determine initial view
+    const firstTime = await isFirstTimeSetup();
+    const pinSetup = await isPinSetup();
+    const pinEnabled = await isPinEnabled();
+    const unlocked = await isUnlocked();
 
-  if (firstTime) {
-    // New user - show onboarding
-    showView('#viewOnboarding');
-  } else if (pinSetup && pinEnabled && !unlocked) {
-    // Has PIN, PIN enabled, locked
-    showView('#viewLock');
-  } else {
-    // Either no PIN, or PIN disabled, or already unlocked
-    if (pinEnabled && pinSetup) {
-      // Use stored PIN
-      currentPassword = null; // Will be entered on lock
+    if (firstTime) {
+      // New user - show onboarding
+      showView('#viewOnboarding');
+    } else if (pinSetup && pinEnabled && !unlocked) {
+      // Has PIN, PIN enabled, locked
+      showView('#viewLock');
     } else {
-      // Use default key
-      currentPassword = null;
+      // Either no PIN, or PIN disabled, or already unlocked
+      if (pinEnabled && pinSetup) {
+        // Use stored PIN
+        currentPassword = null; // Will be entered on lock
+      } else {
+        // Use default key
+        currentPassword = null;
+      }
+      
+      // Unlock with default key if needed
+      if (!unlocked) {
+        await unlockVault(null);
+      }
+      
+      showView('#viewMain');
+      await loadMainView();
+      
+      if (pinEnabled) {
+        setupAutoLock();
+      }
     }
-    
-    // Unlock with default key if needed
-    if (!unlocked) {
-      await unlockVault(null);
-    }
-    
-    showView('#viewMain');
-    await loadMainView();
-    
-    if (pinEnabled) {
-      setupAutoLock();
+  } catch (err) {
+    console.error('Init error:', err);
+    // Show error in UI for debugging
+    const app = document.getElementById('app');
+    if (app) {
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'error-toast';
+      errorDiv.textContent = 'Error: ' + err.message;
+      app.appendChild(errorDiv);
     }
   }
 
   // Check for pending QR scans
   chrome.storage.session.get('pendingQR', async (result) => {
     if (result.pendingQR) {
+      const qrData = result.pendingQR;
       chrome.storage.session.remove('pendingQR');
-      const parsed = parseOtpauthURI(result.pendingQR);
-      populateAddForm(parsed);
-      openModal('#modalAddAccount');
+      
+      console.log('[App] Processing QR data:', qrData.substring(0, 100));
+      
+      try {
+        const parsed = parseOtpauthURI(qrData);
+        console.log('[App] Parsed QR:', parsed);
+        
+        // Auto-add account directly
+        if (parsed && parsed.secret) {
+          const newAccount = await addAccount({
+            issuer: parsed.issuer || '',
+            account: parsed.account || '',
+            secret: parsed.secret,
+            algorithm: parsed.algorithm || 'SHA1',
+            digits: parsed.digits || 6,
+            period: parsed.period || 30
+          }, currentPassword);
+          
+          // Refresh accounts list
+          currentAccounts = await getAccounts();
+          renderAccounts(currentAccounts);
+          
+          // Show success message
+          showToast(`${newAccount.issuer || newAccount.account} added!`, 'success', 3000);
+        } else {
+          throw new Error('Parsed data missing secret');
+        }
+      } catch (e) {
+        console.error('[App] QR parse error:', e);
+        showToast('Failed to add QR: ' + e.message, 'error', 5000);
+        // Also populate add form for manual entry
+        try {
+          populateAddForm({issuer: '', account: '', secret: ''});
+          openModal('#modalAddAccount');
+        } catch (modalErr) {
+          console.error('[App] Modal error:', modalErr);
+        }
+      }
     }
   });
 }
 
+// Handle import from URL params (when redirected from popup)
+async function handleImportFromParams() {
+  const urlParams = new URLSearchParams(window.location.search);
+  
+  // Check if we should auto-trigger file picker
+  if (urlParams.has('selectImport')) {
+    // Small delay to let UI settle
+    setTimeout(() => {
+      $('#importFileInput').click();
+    }, 300);
+    // Clean URL
+    window.history.replaceState({}, '', window.location.pathname);
+    return true;
+  }
+  
+  return false;
+}
+
+// Handle pending import data (legacy support)
+async function handlePendingImport() {
+  const { pendingImportData } = await chrome.storage.session.get('pendingImportData');
+  if (pendingImportData) {
+    // Clear pending data
+    await chrome.storage.session.remove('pendingImportData');
+    
+    // Process the import
+    try {
+      const backup = JSON.parse(pendingImportData);
+      if (backup.accounts && Array.isArray(backup.accounts)) {
+        const result = await importPlainBackup(pendingImportData, currentPassword);
+        currentAccounts = await getAccounts();
+        
+        // Reload folders after import
+        await loadFolders();
+        await renderFolderChips();
+        
+        renderAccounts(currentAccounts);
+        
+        let msg = `Restored ${result.imported} account(s)`;
+        if (result.foldersImported > 0) {
+          msg += ` and ${result.foldersImported} folder(s)`;
+        }
+        showToast(msg + '!', 'success');
+        return true;
+      }
+    } catch (err) {
+      showToast('Import failed: ' + err.message, 'error');
+    }
+  }
+  return false;
+}
+
 // Start the app
-init().catch(console.error);
+init().then(async () => {
+  // Check if there's pending import data (legacy)
+  await handlePendingImport();
+  // Check if we need to auto-trigger import (from popup redirect)
+  await handleImportFromParams();
+}).catch(console.error);

@@ -9,14 +9,31 @@ const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo';
 const STORAGE_KEY_TOKEN = 'googleAuthToken';
 const STORAGE_KEY_USER = 'googleUserProfile';
 
-// OAuth2 config from manifest
-const OAUTH2_CLIENT_ID = '861059574565-2lnjskhsb0s00c1g6fepv7s5kd6veqcs.apps.googleusercontent.com';
+// OAuth2 config - different client IDs for desktop and mobile
+// IMPORTANT: Both client IDs must have the redirect URI registered in Google Cloud Console:
+// Redirect URI format: https://[EXTENSION_ID].chromiumapp.org/
+// Get your extension ID from: chrome://extensions → Developer mode → ID
+const OAUTH2_CLIENT_IDS = {
+  // Desktop: Use "Chrome app" type OR "Web application" with redirect URI registered
+  desktop: '861059574565-gvp72f1nri3l2fhpnls1eu7dtot87dl4.apps.googleusercontent.com',
+  // Mobile: MUST be "Web application" type with redirect URI registered
+  mobile: '861059574565-og5nk13so332lvrjfgcpi05dr05hc1e9.apps.googleusercontent.com'
+};
+
 const OAUTH2_SCOPES = [
   'openid',
   'email',
   'profile',
   'https://www.googleapis.com/auth/drive.file'
 ];
+
+/**
+ * Get the appropriate client ID based on device type
+ */
+function getClientId() {
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  return isMobile ? OAUTH2_CLIENT_IDS.mobile : OAUTH2_CLIENT_IDS.desktop;
+}
 
 /**
  * Check if user is logged in with Google
@@ -51,28 +68,36 @@ export async function getAuthToken() {
  * @returns {Promise<string>} Access token
  */
 async function getAuthTokenWithFallback(interactive = true) {
-  // Try chrome.identity.getAuthToken first (works on desktop)
-  try {
-    const token = await new Promise((resolve, reject) => {
-      chrome.identity.getAuthToken({ interactive }, (token) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else if (!token) {
-          reject(new Error('No token received'));
-        } else {
-          resolve(token);
-        }
-      });
-    });
-    return token;
-  } catch (error) {
-    // If getAuthToken fails (common on mobile), try launchWebAuthFlow
-    console.log('[Google Auth] getAuthToken failed, trying launchWebAuthFlow:', error.message);
-    
+  console.log('[Google Auth] getAuthTokenWithFallback called, interactive:', interactive);
+  
+  // Detect mobile - use launchWebAuthFlow directly on mobile for better compatibility
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const isTabMode = window.innerWidth > 500 || window.outerHeight > 800;
+  
+  console.log('[Google Auth] isMobile:', isMobile, 'isTabMode:', isTabMode, 'innerWidth:', window.innerWidth);
+  
+  // On mobile, always use launchWebAuthFlow - getAuthToken doesn't work on mobile browsers
+  if (isMobile) {
+    console.log('[Google Auth] Mobile detected, using launchWebAuthFlow directly');
     if (!interactive) {
-      throw error; // Can't do non-interactive auth with launchWebAuthFlow
+      throw new Error('Non-interactive auth not available on mobile');
     }
-    
+    return await getTokenViaWebAuthFlow();
+  }
+  
+  // Desktop: use launchWebAuthFlow for popup mode, tab auth for tab mode
+  if (!interactive) {
+    throw new Error('Non-interactive auth not available');
+  }
+  
+  // Detect if running in popup or tab mode
+  const isPopupMode = window.innerWidth <= 500 && window.outerWidth <= 600;
+  
+  if (isPopupMode) {
+    console.log('[Google Auth] Desktop popup mode detected, using launchWebAuthFlow');
+    return await getTokenViaWebAuthFlow();
+  } else {
+    console.log('[Google Auth] Desktop tab mode detected, using tab-based auth');
     return await getTokenViaWebAuthFlow();
   }
 }
@@ -83,28 +108,255 @@ async function getAuthTokenWithFallback(interactive = true) {
  * @returns {Promise<string>} Access token
  */
 async function getTokenViaWebAuthFlow() {
-  const redirectUri = `https://${chrome.runtime.id}.chromiumapp.org/`;
+  console.log('[Google Auth] getTokenViaWebAuthFlow starting...');
+  
+  // Check if chrome.identity is available
+  if (!chrome.identity) {
+    console.error('[Google Auth] chrome.identity API not available!');
+    throw new Error('chrome.identity API not available');
+  }
+  console.log('[Google Auth] chrome.identity available');
+  
+  // Check if running in mobile browser where launchWebAuthFlow may not work
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
+  // Get the appropriate client ID for this device
+  const clientId = getClientId();
+  
+  // Use the standard chromiumapp.org URL for both mobile and desktop
+  // Google requires https:// redirect URIs, not chrome-extension://
+  const redirectUri = chrome.identity.getRedirectURL();
   const state = Math.random().toString(36).substring(2, 15);
+  
+  console.log('[Google Auth] ===========================================');
+  console.log('[Google Auth] Extension ID:', chrome.runtime.id);
+  console.log('[Google Auth] Is Mobile:', isMobile);
+  console.log('[Google Auth] Client ID:', clientId);
+  console.log('[Google Auth] Redirect URI:', redirectUri);
+  console.log('[Google Auth] ===========================================');
+  console.log('[Google Auth] IMPORTANT: Register this Redirect URI in Google Cloud Console:');
+  console.log('[Google Auth] 1. Go to https://console.cloud.google.com/apis/credentials');
+  console.log('[Google Auth] 2. Find OAuth 2.0 Client ID:', clientId);
+  console.log('[Google Auth] 3. Add this EXACT URI to "Authorized redirect URIs":');
+  console.log('[Google Auth]    ', redirectUri);
+  console.log('[Google Auth] ===========================================');
+  
+  // Show alert on mobile to help debugging
+  if (isMobile && typeof window !== 'undefined' && window.alert) {
+    console.log('[Google Auth] If login fails with "redirect_uri_mismatch", register this URI in Google Cloud Console:', redirectUri);
+  }
   
   // Build OAuth2 URL
   const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-  authUrl.searchParams.set('client_id', OAUTH2_CLIENT_ID);
+  authUrl.searchParams.set('client_id', clientId);
   authUrl.searchParams.set('response_type', 'token');
   authUrl.searchParams.set('redirect_uri', redirectUri);
   authUrl.searchParams.set('scope', OAUTH2_SCOPES.join(' '));
   authUrl.searchParams.set('state', state);
+  // Force consent screen to ensure all scopes are granted
   authUrl.searchParams.set('prompt', 'consent');
+  authUrl.searchParams.set('include_granted_scopes', 'true');
+  
+  const authUrlString = authUrl.toString();
+  console.log('[Google Auth] Auth URL:', authUrlString.substring(0, 100) + '...');
+  
+  // On mobile, use tab-based auth instead of launchWebAuthFlow
+  if (isMobile) {
+    return getTokenViaTabAuth(authUrlString, redirectUri, state, clientId);
+  }
+  
+  // Desktop: use launchWebAuthFlow
+  return getTokenViaLaunchWebAuthFlow(authUrlString, state, clientId);
+}
+
+/**
+ * Get token using chrome.tabs API for mobile browsers
+ * launchWebAuthFlow doesn't work reliably on mobile
+ * 
+ * Uses chrome.webRequest to intercept redirect to the chromiumapp.org URL
+ */
+async function getTokenViaTabAuth(authUrlString, redirectUri, state, clientId) {
+  console.log('[Google Auth] Using tab-based authentication for mobile...');
   
   return new Promise((resolve, reject) => {
+    let authTabId = null;
+    let errorDetected = false;
+    
+    // Set timeout
+    const timeoutMs = 120000; // 2 minutes
+    const timeoutId = setTimeout(() => {
+      cleanup();
+      console.error('[Google Auth] Tab auth timed out after', timeoutMs, 'ms');
+      reject(new Error('Authentication timed out. Please try again.'));
+    }, timeoutMs);
+    
+    // Clean up listeners and close tab
+    function cleanup() {
+      clearTimeout(timeoutId);
+      chrome.tabs.onUpdated.removeListener(onTabUpdated);
+      chrome.tabs.onRemoved.removeListener(onTabRemoved);
+      if (authTabId) {
+        chrome.tabs.get(authTabId, (tab) => {
+          if (!chrome.runtime.lastError && tab) {
+            chrome.tabs.remove(authTabId).catch(() => {});
+          }
+        });
+      }
+    }
+    
+    // Listen for tab updates
+    function onTabUpdated(tabId, changeInfo, tab) {
+      if (tabId !== authTabId) return;
+      
+      if (!changeInfo.url) return;
+      
+      console.log('[Google Auth] Tab URL updated:', changeInfo.url.substring(0, 100) + '...');
+      
+      // Check for error page on Google
+      if (changeInfo.url.includes('accounts.google.com') && changeInfo.url.includes('error=')) {
+        try {
+          const url = new URL(changeInfo.url);
+          const errorParam = url.searchParams.get('error');
+          const errorDescription = url.searchParams.get('error_description');
+          
+          if (errorParam) {
+            console.error('[Google Auth] OAuth error detected:', errorParam, errorDescription);
+            errorDetected = true;
+            cleanup();
+            
+            if (errorParam === 'redirect_uri_mismatch') {
+              reject(new Error(
+                `Redirect URI mismatch! Please register this URI in Google Cloud Console:\n${redirectUri}\n\n` +
+                `1. Go to https://console.cloud.google.com/apis/credentials\n` +
+                `2. Find your OAuth 2.0 Client ID:\n${clientId}\n` +
+                `3. Add the above URI to "Authorized redirect URIs"\n\n` +
+                `Then reload the extension and try again.`
+              ));
+            } else {
+              reject(new Error(errorDescription || errorParam));
+            }
+            return;
+          }
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+      
+      // Check if URL matches redirect URI (success case)
+      // The URL will be like: https://[extension-id].chromiumapp.org/#access_token=...&state=...
+      if (changeInfo.url.startsWith(redirectUri)) {
+        console.log('[Google Auth] Detected redirect to extension callback URL');
+        
+        try {
+          const url = new URL(changeInfo.url);
+          const hash = url.hash.substring(1); // Remove leading #
+          
+          if (!hash) {
+            cleanup();
+            reject(new Error('No hash in redirect URL'));
+            return;
+          }
+          
+          const params = new URLSearchParams(hash);
+          const accessToken = params.get('access_token');
+          const returnedState = params.get('state');
+          const errorParam = params.get('error');
+          const errorDescription = params.get('error_description');
+          
+          console.log('[Google Auth] Parsed params - access_token:', accessToken ? 'present' : 'missing', 'state:', returnedState, 'error:', errorParam);
+          
+          if (errorParam) {
+            errorDetected = true;
+            cleanup();
+            reject(new Error(errorDescription || errorParam));
+            return;
+          }
+          
+          if (!accessToken) {
+            cleanup();
+            reject(new Error('No access token in response'));
+            return;
+          }
+          
+          // Verify state to prevent CSRF
+          if (returnedState !== state) {
+            cleanup();
+            console.error('[Google Auth] State mismatch! Expected:', state, 'Got:', returnedState);
+            reject(new Error('State mismatch - possible CSRF attack'));
+            return;
+          }
+          
+          console.log('[Google Auth] Successfully got access token!');
+          cleanup();
+          resolve(accessToken);
+        } catch (err) {
+          cleanup();
+          reject(new Error('Failed to parse redirect URL: ' + err.message));
+        }
+      }
+    }
+    
+    // Listen for tab close (user cancelled)
+    function onTabRemoved(removedTabId) {
+      if (removedTabId === authTabId) {
+        cleanup();
+        if (!errorDetected) {
+          reject(new Error('Authentication cancelled by user'));
+        }
+      }
+    }
+    
+    // Add listeners
+    chrome.tabs.onUpdated.addListener(onTabUpdated);
+    chrome.tabs.onRemoved.addListener(onTabRemoved);
+    
+    // Open auth tab
+    console.log('[Google Auth] Opening auth tab...');
+    chrome.tabs.create({ url: authUrlString, active: true }, (tab) => {
+      if (chrome.runtime.lastError) {
+        cleanup();
+        console.error('[Google Auth] Failed to create tab:', chrome.runtime.lastError.message);
+        reject(new Error('Failed to open authentication: ' + chrome.runtime.lastError.message));
+        return;
+      }
+      
+      authTabId = tab.id;
+      console.log('[Google Auth] Auth tab created with ID:', authTabId);
+    });
+  });
+}
+
+/**
+ * Get token using launchWebAuthFlow (for desktop browsers)
+ */
+async function getTokenViaLaunchWebAuthFlow(authUrlString, state, clientId) {
+  console.log('[Google Auth] Using launchWebAuthFlow for desktop...');
+  
+  return new Promise((resolve, reject) => {
+    // Set timeout
+    const timeoutMs = 60000; // 1 minute
+    const timeoutId = setTimeout(() => {
+      console.error('[Google Auth] launchWebAuthFlow timed out after', timeoutMs, 'ms');
+      reject(new Error('Authentication timed out. Please try again.'));
+    }, timeoutMs);
+    
     chrome.identity.launchWebAuthFlow(
-      { url: authUrl.toString(), interactive: true },
+      { url: authUrlString, interactive: true },
       (redirectUrl) => {
+        clearTimeout(timeoutId);
+        
+        console.log('[Google Auth] launchWebAuthFlow callback fired');
+        console.log('[Google Auth] redirectUrl:', redirectUrl ? 'present' : 'null/empty');
+        console.log('[Google Auth] lastError:', chrome.runtime.lastError ? chrome.runtime.lastError.message : 'none');
+        
         if (chrome.runtime.lastError) {
+          console.error('[Google Auth] launchWebAuthFlow error:', chrome.runtime.lastError.message);
           reject(new Error(chrome.runtime.lastError.message));
           return;
         }
         
         if (!redirectUrl) {
+          console.error('[Google Auth] No redirect URL received');
           reject(new Error('No redirect URL received'));
           return;
         }
@@ -112,6 +364,7 @@ async function getTokenViaWebAuthFlow() {
         // Parse access token from redirect URL hash
         const hash = redirectUrl.split('#')[1];
         if (!hash) {
+          console.error('[Google Auth] No hash in redirect URL:', redirectUrl);
           reject(new Error('No hash in redirect URL'));
           return;
         }
@@ -119,19 +372,25 @@ async function getTokenViaWebAuthFlow() {
         const params = new URLSearchParams(hash);
         const accessToken = params.get('access_token');
         const returnedState = params.get('state');
+        const errorParam = params.get('error');
+        
+        console.log('[Google Auth] Parsed params - access_token:', accessToken ? 'present' : 'missing', 'state:', returnedState, 'error:', errorParam);
         
         if (!accessToken) {
-          const error = params.get('error');
-          reject(new Error(error || 'No access token in response'));
+          const error = errorParam || 'No access token in response';
+          console.error('[Google Auth] No access token:', error);
+          reject(new Error(error));
           return;
         }
         
         // Verify state to prevent CSRF
         if (returnedState !== state) {
+          console.error('[Google Auth] State mismatch! Expected:', state, 'Got:', returnedState);
           reject(new Error('State mismatch - possible CSRF attack'));
           return;
         }
         
+        console.log('[Google Auth] Successfully got access token!');
         resolve(accessToken);
       }
     );

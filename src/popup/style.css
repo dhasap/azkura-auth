@@ -83,6 +83,26 @@ html, body {
   overflow: hidden !important;
 }
 
+/* Additional Chromebook/Desktop fixes */
+html {
+  box-sizing: border-box;
+}
+
+body {
+  position: relative;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+#app {
+  width: 400px !important;
+  height: 600px !important;
+  min-width: 400px !important;
+  min-height: 600px !important;
+  max-width: 400px !important;
+  max-height: 600px !important;
+}
+
 button {
   font-family: inherit;
   cursor: pointer;
@@ -242,6 +262,23 @@ input, textarea {
   padding: 20px;
   background: var(--bg-overlay);
   pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+}
+
+.profile-menu {
+  width: 260px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+  transform: scale(0.95) translateY(-20px);
+  opacity: 0;
+  transition: transform var(--transition-fast), opacity var(--transition-fast);
+  pointer-events: none;
+  margin: auto;
 }
 
 .profile-menu-overlay.open {
@@ -1486,7 +1523,18 @@ input, textarea {
 /* Settings Modal Scroll Fix */
 #modalSettings .modal-body {
   max-height: calc(85vh - 60px);
-  overflow-y: auto;
+  overflow-y: auto !important;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-medium) transparent;
+}
+
+#modalSettings .modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+#modalSettings .modal-body::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 3px;
 }
 
 /* =========================================================
@@ -1616,21 +1664,212 @@ input, textarea {
   border-color: var(--accent);
 }
 
+/* Note: Mobile sekarang pakai src/app/index.html (fullscreen)
+   Popup ini hanya untuk Desktop dengan fixed size 400x600px */
+
 /* =========================================================
-   Responsive - Mobile Override
+   Profile Statistics Dashboard Styles
    ========================================================= */
 
-/* Override untuk Mobile Browser (Lemur/Kiwi) saat dibuka di Tab Baru */
-@media screen and (max-width: 768px) {
-  html, body {
-    width: 100vw !important;
-    height: 100vh !important;
-    min-width: 100vw !important;
-    min-height: 100vh !important;
-    max-width: none !important;
-    max-height: none !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
+/* Stats Menu Container */
+.profile-menu-stats {
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.profile-menu-stats::-webkit-scrollbar {
+  width: 6px;
+}
+
+.profile-menu-stats::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.profile-menu-stats::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 3px;
+}
+
+/* Security Badge */
+.profile-security-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--accent-dim);
+  color: var(--accent);
+  margin-top: 4px;
+  width: fit-content;
+}
+
+/* Stats Dashboard Container */
+.profile-stats-dashboard {
+  padding: 16px;
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  margin: 12px 0;
+  border: 1px solid var(--border-subtle);
+}
+
+/* Quick Stats Cards Row */
+.stats-cards-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  padding: 12px 8px;
+  text-align: center;
+  border: 1px solid var(--border-subtle);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
+}
+
+.stat-card-icon {
+  font-size: 20px;
+  margin-bottom: 4px;
+}
+
+.stat-card-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.stat-card-label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+/* Stats Section */
+.stats-section {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.stats-section:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.stats-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Security Score Bar */
+.security-score-bar {
+  height: 8px;
+  background: var(--border-subtle);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.security-score-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: var(--radius-full);
+  transition: width 0.8s ease, background-color 0.3s ease;
+}
+
+.security-score-legend {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Service Distribution */
+.service-distribution {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.service-donut-chart {
+  flex-shrink: 0;
+}
+
+.service-donut-chart svg {
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+
+.service-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Most Used List */
+.most-used-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.most-used-list > div {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.most-used-list > div:last-child {
+  border-bottom: none;
+}
+
+/* Weekly Activity Chart */
+.weekly-activity-chart {
+  display: flex;
+  gap: 4px;
+  height: 60px;
+  align-items: flex-end;
+  padding: 8px 0;
+}
+
+/* Folder Distribution */
+.folder-distribution-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Responsive adjustments for stats */
+@media (max-width: 400px) {
+  .stats-cards-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .stat-card-value {
+    font-size: 16px;
+  }
+  
+  .service-distribution {
+    flex-direction: column;
+    text-align: center;
   }
 }
+
+/* Note: Mobile sekarang pakai src/app/index.html (fullscreen)
+   Popup ini hanya untuk Desktop dengan fixed size 400x600px */
