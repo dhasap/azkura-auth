@@ -2,7 +2,7 @@
 
 Chrome Extension untuk Two-Factor Authentication (2FA) dengan fitur backup ke Google Drive dan PIN optional.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-2.1.5-blue)
 ![Manifest](https://img.shields.io/badge/Manifest-V3-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
 
@@ -13,30 +13,37 @@ Chrome Extension untuk Two-Factor Authentication (2FA) dengan fitur backup ke Go
 - **🔒 PIN Optional** - Enkripsi vault dengan PIN (bisa di-skip)
 - **☁️ Google Drive Backup** - Backup & restore data ke Google Drive
 - **👤 Google Sign-In** - Login dengan akun Google untuk backup
-- **📱 Responsive UI** - Tampilan modern dan responsif
+- **📱 Responsive UI** - Tampilan modern dan responsif untuk desktop & mobile
+- **📊 Statistics** - Tracking statistik penggunaan akun
+- **🎯 Standalone App** - Full-page app mode untuk pengalaman lebih baik di mobile
 
-## 🚀 Cara Install (Development)
+## 📥 Download
 
-### 1. Clone & Install Dependencies
+| Versi | Download |
+|-------|----------|
+| **v2.1.5 (Latest)** | [Source Code](https://github.com/dhasap/azkura-auth/releases/download/v2.1.5/azkura-auth-v2.1.5-source.tar.gz) · [Dist (Ready Install)](https://github.com/dhasap/azkura-auth/releases/download/v2.1.5/azkura-auth-v2.1.5-dist.tar.gz) |
+| All Releases | [Releases Page](https://github.com/dhasap/azkura-auth/releases) |
+
+## 🚀 Cara Install
+
+### Install dari Release (Cepat)
+
+1. Download `azkura-auth-v2.1.5-dist.tar.gz` dari [releases](https://github.com/dhasap/azkura-auth/releases)
+2. Extract file
+3. Buka `chrome://extensions/`
+4. Aktifkan **Developer mode**
+5. Klik **Load unpacked** → Pilih folder hasil extract
+
+### Install dari Source (Development)
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/dhasap/azkura-auth.git
 cd azkura-auth
 npm install
-```
-
-### 2. Build Extension
-
-```bash
 npm run build
 ```
 
-### 3. Load ke Chrome
-
-1. Buka `chrome://extensions/`
-2. Aktifkan **Developer mode** (toggle kanan atas)
-3. Klik **Load unpacked**
-4. Pilih folder `dist/`
+Lalu load folder `dist/` ke Chrome extensions.
 
 ## ⚙️ Konfigurasi Google OAuth2 (Wajib untuk Backup)
 
@@ -51,23 +58,32 @@ Agar fitur Google Login & Backup berfungsi, Anda perlu setup di Google Cloud Con
 - **Google Identity Toolkit API**
 
 ### 3. Buat OAuth2 Credentials
+
+**Untuk Desktop:**
 - Go to **APIs & Services > Credentials**
 - Klik **Create Credentials > OAuth client ID**
 - Pilih **Chrome Extension**
 - Masukkan **Application ID** extension (lihat di `chrome://extensions/`)
 
-### 4. Tambahkan Redirect URI
+**Untuk Mobile (Wajib Web Application type):**
+- Pilih **Web application**
+- Tambahkan **Authorized redirect URIs** (lihat langkah 4)
 
-Setelah extension di-load pertama kali, dapatkan Extension ID dari Chrome, lalu tambahkan redirect URI:
+### 4. Tambahkan Redirect URI ⭐ Penting
 
-```
-https://<EXTENSION_ID>.chromiumapp.org/
-```
+Extension ID dapat berubah jika extension di-remove dan di-load ulang. Setelah extension di-load:
+
+1. Buka extension popup → tekan F12 untuk buka DevTools
+2. Cek console untuk melihat **Redirect URI** yang harus didaftarkan
+3. Atau hitung manual: `https://<EXTENSION_ID>.chromiumapp.org/`
 
 Contoh:
 ```
-https://abc123defghijklmnop.chromiumapp.org/
+https://cgikfceghgefkafghdebelllfhlglpjd.chromiumapp.org/
 ```
+
+**⚠️ Penting untuk Mobile:**
+Jika login Google gagal di mobile dengan error *"redirect_uri_mismatch"*, daftarkan URI tersebut ke **Web application** OAuth client ID (bukan Chrome Extension type).
 
 ### 5. Update Client ID (Jika Perlu)
 
@@ -85,23 +101,38 @@ Jika menggunakan Client ID sendiri, update di `manifest.json`:
 }
 ```
 
+Dan update juga di `src/core/google-auth.js`:
+```javascript
+const OAUTH2_CLIENT_IDS = {
+  desktop: 'YOUR_DESKTOP_CLIENT_ID.apps.googleusercontent.com',
+  mobile: 'YOUR_MOBILE_CLIENT_ID.apps.googleusercontent.com'
+};
+```
+
 ## 📁 Struktur Folder
 
 ```
 azkura-auth/
 ├── src/
-│   ├── popup/           # Popup UI (HTML, CSS, JS)
-│   ├── core/            # Core logic
-│   │   ├── totp.js      # TOTP generation (otplib)
-│   │   ├── crypto.js    # Encryption/decryption
-│   │   ├── google-auth.js   # Google OAuth
-│   │   └── google-drive.js  # Drive API
-│   ├── scanner/         # QR Scanner
-│   └── background.js    # Service worker
-├── icons/               # Extension icons
-├── dist/                # Build output
-├── manifest.json        # Extension manifest
-└── vite.config.js       # Build config
+│   ├── popup/              # Popup UI (HTML, CSS, JS)
+│   ├── app/                # Standalone app page
+│   ├── scanner/            # QR Scanner page
+│   ├── auth/               # Auth callback handler
+│   ├── background/         # Service worker
+│   └── core/               # Core logic
+│       ├── totp.js         # TOTP generation (otplib)
+│       ├── crypto.js       # Encryption/decryption
+│       ├── storage.js      # Chrome storage wrapper
+│       ├── accounts.js     # Account management
+│       ├── google-auth.js  # Google OAuth (desktop & mobile)
+│       ├── google-drive.js # Drive API integration
+│       ├── service-icons.js # Service icon mapping
+│       ├── stats.js        # Usage statistics
+│       └── uri-parser.js   # TOTP URI parser
+├── icons/                  # Extension icons
+├── dist/                   # Build output
+├── manifest.json           # Extension manifest
+└── vite.config.js          # Build config
 ```
 
 ## 🛠️ Tech Stack
@@ -124,15 +155,27 @@ azkura-auth/
 
 - **Enkripsi**: AES-256-GCM dengan PBKDF2 key derivation
 - **PIN Hash**: SHA-256 dengan salt unik per user
-- **Data Storage**: Chrome Storage API (local)
+- **Data Storage**: Chrome Storage API (local & session)
 - **Backup**: Data dienkripsi sebelum diupload ke Drive
+- **Auto-lock**: Vault terkunci otomatis setelah idle
 
 ## 🐛 Troubleshooting
 
-### Google Login tidak berfungsi
+### Google Login tidak berfungsi di Mobile
+
+**Error:** *"Anda tidak dapat login ke aplikasi ini karena aplikasi ini tidak mematuhi kebijakan OAuth 2.0 Google"*
+
+**Solusi:**
+1. Dapatkan Extension ID dari `chrome://extensions/`
+2. Buka [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+3. Cari OAuth 2.0 Client ID untuk mobile (Web application type)
+4. Tambahkan redirect URI: `https://<EXTENSION_ID>.chromiumapp.org/`
+5. Tunggu 5-10 menit, lalu coba lagi
+
+### Google Login tidak berfungsi di Desktop
 - Pastikan Extension ID sudah didaftarkan di Google Cloud Console
-- Cek apakah redirect URI sudah benar
-- Verifikasi client_id di `manifest.json`
+- Untuk desktop, gunakan **Chrome Extension** type (bukan Web application)
+- Cek apakah redirect URI sudah benar di console DevTools
 
 ### Build gagal
 ```bash
@@ -146,6 +189,35 @@ Extension ID akan konsisten jika menggunakan key di manifest. Untuk development,
 - Extension di-remove dan di-load ulang
 - Tidak menggunakan `key` di manifest.json
 
+**Solusi:** Set Extension ID permanen dengan menambahkan `key` di `manifest.json`:
+```json
+{
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA..."
+}
+```
+
+Generate key dengan: `openssl rsa -in key.pem -pubout -outform der | openssl base64 -A`
+
+## 📝 Changelog
+
+### v2.1.5
+- ✨ Added standalone app page untuk mobile
+- ✨ Added auth callback handler
+- ✨ Added statistics tracking
+- 🐛 Improved OAuth error handling untuk mobile
+- 🔧 Enhanced QR scanner functionality
+- 🔧 Updated service icons handling
+- 🔧 Better storage management
+- 🔧 Improved URI parser
+
+### v1.0.0
+- 🎉 Initial release
+- 🔢 TOTP generation
+- 📷 QR scanner
+- 🔒 PIN encryption
+- ☁️ Google Drive backup
+- 👤 Google Sign-In
+
 ## 📄 License
 
 MIT License - lihat file LICENSE untuk detail.
@@ -153,3 +225,5 @@ MIT License - lihat file LICENSE untuk detail.
 ---
 
 **Azkura Auth** - Authenticator sederhana dengan backup cloud. ☁️🔐
+
+Made with ❤️ for secure 2FA management.
