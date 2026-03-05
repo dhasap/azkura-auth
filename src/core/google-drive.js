@@ -3,7 +3,7 @@
  * Handles backup/restore operations to Google Drive
  */
 
-import { getAuthToken, refreshUserProfile, logoutGoogle } from './google-auth.js';
+import { getAuthToken, getValidAuthToken, refreshUserProfile, logoutGoogle, clearInvalidToken } from './google-auth.js';
 import { getFolders } from './storage.js';
 
 const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
@@ -15,6 +15,7 @@ let tokenRefreshQueue = [];
 
 /**
  * Handle token expiration by refreshing or prompting re-login
+ * On mobile: clears invalid token since auto-refresh may not work
  * @returns {Promise<boolean>} - true if token was refreshed successfully
  */
 async function handleTokenExpiration() {
@@ -28,6 +29,18 @@ async function handleTokenExpiration() {
   isRefreshingToken = true;
   
   try {
+    // Detect mobile - on mobile, auto-refresh often doesn't work reliably
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+      console.log('[Google Drive] Mobile detected, clearing invalid token instead of refresh');
+      // On mobile, clear the invalid token and let user re-login
+      await clearInvalidToken();
+      tokenRefreshQueue.forEach(resolve => resolve(false));
+      tokenRefreshQueue = [];
+      return false;
+    }
+    
     // Try to refresh user profile (this will get a new token if possible)
     const result = await refreshUserProfile();
     
@@ -37,15 +50,17 @@ async function handleTokenExpiration() {
       tokenRefreshQueue = [];
       return true;
     } else {
-      // Refresh failed, need to re-login
-      await logoutGoogle();
+      // Refresh failed, clear invalid token
+      console.log('[Google Drive] Token refresh failed, clearing invalid token');
+      await clearInvalidToken();
       tokenRefreshQueue.forEach(resolve => resolve(false));
       tokenRefreshQueue = [];
       return false;
     }
   } catch (error) {
     console.error('[Google Drive] Token refresh failed:', error);
-    await logoutGoogle();
+    // Clear invalid token instead of full logout to preserve user profile info
+    await clearInvalidToken();
     tokenRefreshQueue.forEach(resolve => resolve(false));
     tokenRefreshQueue = [];
     return false;
@@ -55,17 +70,37 @@ async function handleTokenExpiration() {
 }
 
 /**
+ * Check if error is due to authentication failure
+ * @param {Response} response 
+ * @returns {boolean}
+ */
+function isAuthError(response) {
+  return response.status === 401 || response.status === 403;
+}
+
+/**
  * Make authenticated request to Google Drive API with automatic token refresh
+ * Validates token before use and handles token expiration gracefully
  * @param {string} url - API URL
  * @param {object} options - Fetch options
  * @param {boolean} [retry=true] - Whether to retry on 401
  * @returns {Promise<Response>}
  */
 async function driveApiRequest(url, options = {}, retry = true) {
-  const token = await getAuthToken();
+  // Use getValidAuthToken to ensure token is validated before use
+  let token = await getValidAuthToken();
+  
+  // If no valid token, try to refresh once
+  if (!token && retry) {
+    console.log('[Google Drive] No valid token, attempting refresh...');
+    const refreshed = await handleTokenExpiration();
+    if (refreshed) {
+      token = await getValidAuthToken();
+    }
+  }
   
   if (!token) {
-    throw new Error('Not authenticated with Google');
+    throw new Error('Session expired. Please sign in again.');
   }
 
   const authOptions = {
@@ -76,10 +111,15 @@ async function driveApiRequest(url, options = {}, retry = true) {
     }
   };
 
-  const response = await fetch(url, authOptions);
+  let response;
+  try {
+    response = await fetch(url, authOptions);
+  } catch (fetchError) {
+    throw new Error('Failed to fetch. Please check your internet connection.');
+  }
 
   // Handle 401 Unauthorized - token expired
-  if (response.status === 401 && retry) {
+  if (isAuthError(response) && retry) {
     console.log('[Google Drive] Token expired, attempting refresh...');
     const refreshed = await handleTokenExpiration();
     
@@ -90,6 +130,11 @@ async function driveApiRequest(url, options = {}, retry = true) {
     } else {
       throw new Error('Session expired. Please sign in again.');
     }
+  }
+  
+  // Handle 401/403 without retry - token is truly invalid
+  if (isAuthError(response) && !retry) {
+    throw new Error('Session expired. Please sign in again.');
   }
 
   return response;

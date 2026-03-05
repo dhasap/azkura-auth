@@ -83,6 +83,13 @@ html, body {
   overflow: hidden !important;
 }
 
+/* Desktop view: Center the popup when opened as tab/window */
+@media screen and (min-width: 500px) {
+  html, body {
+    margin: 0 auto !important;
+  }
+}
+
 /* Additional Chromebook/Desktop fixes */
 html {
   box-sizing: border-box;
@@ -698,6 +705,13 @@ input, textarea {
   flex-direction: column;
   align-items: flex-end;
   gap: 12px;
+}
+
+/* Desktop popup centering - ensure FAB stays within bounds */
+@media screen and (min-width: 400px) {
+  .fab-container {
+    right: max(16px, calc(50% - 184px));
+  }
 }
 
 .fab-menu {

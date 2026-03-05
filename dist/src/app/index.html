@@ -51,10 +51,67 @@
     #viewLock.active {
       z-index: 100;
     }
+    
+    /* Desktop: Center container and limit max-width */
+    @media screen and (min-width: 600px) {
+      body {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: #0a0a0a !important;
+      }
+      
+      #app {
+        position: relative;
+        width: 100% !important;
+        max-width: 450px !important;
+        max-height: 850px !important;
+        min-height: 600px !important;
+        height: 100% !important;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+        overflow: hidden;
+        margin: auto;
+      }
+      
+      /* Adjust FAB position for desktop centered view */
+      /* FAB should be positioned relative to the centered #app container */
+      .fab-container {
+        position: fixed !important;
+        right: calc(50% - 185px) !important;
+        bottom: max(24px, calc(50% - 385px)) !important;
+        z-index: 100;
+      }
+    }
+    
+    /* Large desktop: maintain centering */
+    @media screen and (min-width: 1200px) {
+      #app {
+        max-width: 480px !important;
+        max-height: 900px !important;
+      }
+      
+      .fab-container {
+        right: calc(50% - 200px) !important;
+        bottom: max(24px, calc(50% - 410px)) !important;
+      }
+    }
+    
+    /* Small desktop/tablet adjustment */
+    @media screen and (min-width: 600px) and (max-height: 900px) {
+      #app {
+        max-height: 95vh !important;
+        min-height: 500px !important;
+      }
+      
+      .fab-container {
+        bottom: max(20px, calc(50% - 260px)) !important;
+      }
+    }
   </style>
   <script type="module" crossorigin src="/assets/modulepreload-polyfill-B5Qt9EMX.js"></script>
-  <script type="module" crossorigin src="/assets/main-CHd-a0cQ.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main-A9N6dqk8.css">
+  <script type="module" crossorigin src="/assets/main-Dl1LhvLH.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main-dfYfQVD-.css">
 </head>
 <body>
   <div id="app">

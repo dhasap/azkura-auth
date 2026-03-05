@@ -225,7 +225,7 @@ export async function createFolder(name, color = '#00E5FF') {
 /**
  * Delete a folder
  * @param {string} folderId
- * @param {string} password - Vault password for re-encryption
+ * @param {string} password - Vault password for re-encryption (null if no PIN)
  */
 export async function deleteFolder(folderId, password) {
   const folders = await getFolders();
@@ -242,12 +242,12 @@ export async function deleteFolder(folderId, password) {
   await setSessionItem('accounts', accounts);
   
   // Re-encrypt vault to persist folder changes
-  if (password) {
-    const { encrypt } = await import('./crypto.js');
-    const plaintext = JSON.stringify(accounts);
-    const encrypted = await encrypt(plaintext, password);
-    await setLocalItem('vault', encrypted);
-  }
+  // Always save to vault even without password (use default key)
+  const { encrypt, getDefaultKey } = await import('./crypto.js');
+  const vaultPassword = password || await getDefaultKey();
+  const plaintext = JSON.stringify(accounts);
+  const encrypted = await encrypt(plaintext, vaultPassword);
+  await setLocalItem('vault', encrypted);
 }
 
 /**
@@ -271,7 +271,7 @@ export async function setUncategorizedHidden(hidden) {
  * Move account to folder
  * @param {string} accountId
  * @param {string|null} folderId
- * @param {string} password - Vault password for re-encryption
+ * @param {string} password - Vault password for re-encryption (null if no PIN)
  */
 export async function moveAccountToFolder(accountId, folderId, password) {
   const accounts = await getSessionItem('accounts') || [];
@@ -285,11 +285,11 @@ export async function moveAccountToFolder(accountId, folderId, password) {
     await setSessionItem('accounts', accounts);
     
     // Re-encrypt vault to persist folder assignment
-    if (password) {
-      const { encrypt } = await import('./crypto.js');
-      const plaintext = JSON.stringify(accounts);
-      const encrypted = await encrypt(plaintext, password);
-      await setLocalItem('vault', encrypted);
-    }
+    // Always save to vault even without password (use default key)
+    const { encrypt, getDefaultKey } = await import('./crypto.js');
+    const vaultPassword = password || await getDefaultKey();
+    const plaintext = JSON.stringify(accounts);
+    const encrypted = await encrypt(plaintext, vaultPassword);
+    await setLocalItem('vault', encrypted);
   }
 }

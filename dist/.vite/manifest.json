@@ -5,16 +5,16 @@
     "src": "../../../@crx/manifest",
     "isEntry": true
   },
-  "_main-A9N6dqk8.css": {
-    "file": "assets/main-A9N6dqk8.css",
-    "src": "_main-A9N6dqk8.css"
-  },
-  "_main-CHd-a0cQ.js": {
-    "file": "assets/main-CHd-a0cQ.js",
+  "_main-Dl1LhvLH.js": {
+    "file": "assets/main-Dl1LhvLH.js",
     "name": "main",
     "css": [
-      "assets/main-A9N6dqk8.css"
+      "assets/main-dfYfQVD-.css"
     ]
+  },
+  "_main-dfYfQVD-.css": {
+    "file": "assets/main-dfYfQVD-.css",
+    "src": "_main-dfYfQVD-.css"
   },
   "_modulepreload-polyfill-B5Qt9EMX.js": {
     "file": "assets/modulepreload-polyfill-B5Qt9EMX.js",

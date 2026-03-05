@@ -8,6 +8,10 @@ import { setLocalItem, getLocalItem, removeLocalItem } from './storage.js';
 const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo';
 const STORAGE_KEY_TOKEN = 'googleAuthToken';
 const STORAGE_KEY_USER = 'googleUserProfile';
+const STORAGE_KEY_TOKEN_TIME = 'googleAuthTokenTime';
+
+// Token validity period (55 minutes, tokens usually valid for 1 hour)
+const TOKEN_VALIDITY_MS = 55 * 60 * 1000;
 
 // OAuth2 config - different client IDs for desktop and mobile
 // IMPORTANT: Both client IDs must have the redirect URI registered in Google Cloud Console:
@@ -58,7 +62,21 @@ export async function getUserProfile() {
  * @returns {Promise<string | null>}
  */
 export async function getAuthToken() {
-  return await getLocalItem(STORAGE_KEY_TOKEN);
+  const token = await getLocalItem(STORAGE_KEY_TOKEN);
+  const tokenTime = await getLocalItem(STORAGE_KEY_TOKEN_TIME);
+  
+  // Check if token is expired
+  if (token && tokenTime) {
+    const elapsed = Date.now() - tokenTime;
+    if (elapsed > TOKEN_VALIDITY_MS) {
+      console.log('[Google Auth] Token expired, clearing...');
+      await removeLocalItem(STORAGE_KEY_TOKEN);
+      await removeLocalItem(STORAGE_KEY_TOKEN_TIME);
+      return null;
+    }
+  }
+  
+  return token;
 }
 
 /**
@@ -406,8 +424,9 @@ export async function loginGoogle() {
     // Get auth token with fallback for mobile
     const token = await getAuthTokenWithFallback(true);
 
-    // Store token
+    // Store token and timestamp
     await setLocalItem(STORAGE_KEY_TOKEN, token);
+    await setLocalItem(STORAGE_KEY_TOKEN_TIME, Date.now());
 
     // Fetch user profile
     const user = await fetchUserProfile(token);
@@ -453,6 +472,7 @@ export async function logoutGoogle() {
 
     // Clear stored data
     await removeLocalItem(STORAGE_KEY_TOKEN);
+    await removeLocalItem(STORAGE_KEY_TOKEN_TIME);
     await removeLocalItem(STORAGE_KEY_USER);
 
     return { success: true };
@@ -479,6 +499,8 @@ export async function refreshUserProfile() {
     
     if (user) {
       await setLocalItem(STORAGE_KEY_USER, user);
+      // Update timestamp on successful validation
+      await setLocalItem(STORAGE_KEY_TOKEN_TIME, Date.now());
       return { success: true, user };
     }
 
@@ -487,6 +509,7 @@ export async function refreshUserProfile() {
     try {
       const newToken = await getAuthTokenWithFallback(false);
       await setLocalItem(STORAGE_KEY_TOKEN, newToken);
+      await setLocalItem(STORAGE_KEY_TOKEN_TIME, Date.now());
       const refreshedUser = await fetchUserProfile(newToken);
       
       if (refreshedUser) {
@@ -502,6 +525,7 @@ export async function refreshUserProfile() {
     console.error('[Google Auth] Refresh failed:', error);
     // Clear stored data if refresh fails
     await removeLocalItem(STORAGE_KEY_TOKEN);
+    await removeLocalItem(STORAGE_KEY_TOKEN_TIME);
     await removeLocalItem(STORAGE_KEY_USER);
     return { success: false, error: error.message };
   }
@@ -541,6 +565,7 @@ async function fetchUserProfile(token) {
 
 /**
  * Validate if current token is still valid
+ * Makes an actual API call to verify token is not expired/revoked
  * @returns {Promise<boolean>}
  */
 export async function validateToken() {
@@ -551,8 +576,59 @@ export async function validateToken() {
     const response = await fetch(GOOGLE_USERINFO_URL, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
+    
+    // If token is expired or invalid, clear it
+    if (response.status === 401) {
+      console.log('[Google Auth] Token invalidated (401), clearing...');
+      await clearInvalidToken();
+      return false;
+    }
+    
     return response.ok;
-  } catch {
+  } catch (error) {
+    console.error('[Google Auth] Token validation error:', error);
     return false;
   }
+}
+
+/**
+ * Clear invalid token from storage
+ * Called when token is expired, revoked, or invalid
+ * @returns {Promise<void>}
+ */
+export async function clearInvalidToken() {
+  console.log('[Google Auth] Clearing invalid token...');
+  await removeLocalItem(STORAGE_KEY_TOKEN);
+  await removeLocalItem(STORAGE_KEY_TOKEN_TIME);
+  await removeLocalItem(STORAGE_KEY_USER);
+}
+
+/**
+ * Get valid auth token with validation
+ * Validates token before returning, clears if invalid
+ * @returns {Promise<string|null>} - Valid token or null if invalid/not found
+ */
+export async function getValidAuthToken() {
+  const token = await getLocalItem(STORAGE_KEY_TOKEN);
+  const tokenTime = await getLocalItem(STORAGE_KEY_TOKEN_TIME);
+  
+  if (!token) return null;
+  
+  // Check if token is expired based on timestamp
+  if (tokenTime) {
+    const elapsed = Date.now() - tokenTime;
+    if (elapsed > TOKEN_VALIDITY_MS) {
+      console.log('[Google Auth] Token expired based on timestamp, clearing...');
+      await clearInvalidToken();
+      return null;
+    }
+  }
+  
+  // Additional validation: make sure token is still valid with Google
+  const isValid = await validateToken();
+  if (!isValid) {
+    return null;
+  }
+  
+  return token;
 }
