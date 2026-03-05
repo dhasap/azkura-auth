@@ -2,7 +2,7 @@
 
 Chrome Extension untuk Two-Factor Authentication (2FA) dengan fitur backup ke Google Drive dan PIN optional.
 
-![Version](https://img.shields.io/badge/version-2.1.5-blue)
+![Version](https://img.shields.io/badge/version-2.7.0-blue)
 ![Manifest](https://img.shields.io/badge/Manifest-V3-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
 
@@ -21,14 +21,14 @@ Chrome Extension untuk Two-Factor Authentication (2FA) dengan fitur backup ke Go
 
 | Versi | Download |
 |-------|----------|
-| **v2.1.5 (Latest)** | [Source Code](https://github.com/dhasap/azkura-auth/releases/download/v2.1.5/azkura-auth-v2.1.5-source.tar.gz) · [Dist (Ready Install)](https://github.com/dhasap/azkura-auth/releases/download/v2.1.5/azkura-auth-v2.1.5-dist.tar.gz) |
+| **v2.7.0 (Latest)** | [Source Code](https://github.com/dhasap/azkura-auth/releases/download/v2.7.0/azkura-auth-v2.7.0-source.tar.gz) · [Dist (Ready Install)](https://github.com/dhasap/azkura-auth/releases/download/v2.7.0/azkura-auth-v2.7.0-dist.tar.gz) |
 | All Releases | [Releases Page](https://github.com/dhasap/azkura-auth/releases) |
 
 ## 🚀 Cara Install
 
 ### Install dari Release (Cepat)
 
-1. Download `azkura-auth-v2.1.5-dist.tar.gz` dari [releases](https://github.com/dhasap/azkura-auth/releases)
+1. Download `azkura-auth-v2.7.0-dist.tar.gz` dari [releases](https://github.com/dhasap/azkura-auth/releases)
 2. Extract file
 3. Buka `chrome://extensions/`
 4. Aktifkan **Developer mode**
@@ -199,6 +199,20 @@ Extension ID akan konsisten jika menggunakan key di manifest. Untuk development,
 Generate key dengan: `openssl rsa -in key.pem -pubout -outform der | openssl base64 -A`
 
 ## 📝 Changelog
+
+### v2.7.0
+- ✨ Added support untuk semua layanan populer (300+ services)
+- ✨ Added fitur hapus backup dari Google Drive
+- ✨ Added folder management untuk backup files
+- ✨ Added service logo otomatis berdasarkan nama layanan
+- 🔧 Mobile compatibility dan UX improvements
+- 🔧 Restore dari Drive tidak perlu password lagi
+- 🔧 Profile menu dengan posisi yang lebih baik
+- 🔧 QR upload via scanner tab
+- 🔧 Settings scroll improvements
+- 🔧 Popup layout fixes untuk berbagai ukuran layar
+- 🔧 Enhanced OAuth error messages dan debugging info
+- 🔧 Improved PIN hashing dengan salt unik
 
 ### v2.1.5
 - ✨ Added standalone app page untuk mobile

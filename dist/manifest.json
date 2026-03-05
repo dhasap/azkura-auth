@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Azkura Auth",
-  "version": "2.1.5",
+  "version": "2.7.0",
   "description": "Secure TOTP Authenticator with beautiful dark UI",
   "icons": {
     "16": "icons/icon16.png",
